@@ -1,0 +1,18 @@
+{
+  "name": "american-mahjong-online",
+  "version": "1.0.0",
+  "description": "美國麻將 4 人連線 (Node.js)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run.js",
+    "test:quick": "FUZZ_GAMES=30 SIM_GAMES=15 node test/run.js",
+    "test:ui": "node test/ui/run.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.18.1"
+  }
+}

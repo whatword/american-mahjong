@@ -1,0 +1,25 @@
+# 套件 (npm install 會重新產生)
+node_modules/
+
+# 計分板戰績：執行時產生的資料，內含玩家 email，不要放進版本控制
+data/
+
+# 畫面測試的截圖 (SCREENSHOTS=1 npm run test:ui 時產生)
+test/ui/screenshots/
+
+# 記錄檔
+*.log
+npm-debug.log*
+
+# 環境變數與機密設定
+.env
+.env.*
+
+# 系統與編輯器產生的檔案
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Cloudflare Wrangler 本機暫存 (若之後部署到 Cloudflare)
+.wrangler/

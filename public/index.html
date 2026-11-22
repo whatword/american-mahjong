@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#083222">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>美國麻將・連線版</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="panel">
+  <h1>🀄 美國麻將</h1>
+  <p class="sub">4 人連線版</p>
+  <form id="loginForm" novalidate>
+    <label>暱稱 <input id="name" maxlength="12" placeholder="玩家名稱" autocomplete="nickname" required></label>
+    <label>帳號（Email） <input id="email" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email" required aria-describedby="emailHint"></label>
+    <p id="emailHint" class="hint fieldhint">帳號只用於計分板記錄使用（會顯示在計分板上）</p>
+    <button id="loginBtn" type="submit">登入</button>
+  </form>
+  <p id="loginErr" class="err"></p>
+</div>
+
+<div id="hall" class="panel wide hidden">
+  <div class="hallhead">
+    <h2>🀄 大廳</h2>
+    <div><span id="hallMe"></span> <button id="logoutBtn" class="ghost">登出</button></div>
+  </div>
+  <div class="row hallbar">
+    <button id="createBtn">＋ 開新房間</button>
+    <span id="hallCount" class="hint"></span>
+  </div>
+  <div id="roomList"></div>
+  <div class="boardsec">
+    <h2>🏆 計分板</h2>
+    <p class="hint">依累計金額排名（所有房間、所有局數的輸贏總和）。點選玩家或電腦查看戰績。</p>
+    <div id="podium"></div>
+    <div id="rankList"></div>
+  </div>
+</div>
+
+<div id="statModal" class="hidden"></div>
+
+<!-- 語音設定面板 -->
+<div id="voicePanel" class="hidden" role="dialog" aria-label="語音朗讀設定">
+  <div class="vp-head"><b>🔊 語音朗讀</b><button id="vpClose" type="button" class="ghost small" aria-label="關閉">✕</button></div>
+  <label class="vp-row vp-switch"><input type="checkbox" id="vpOn"> 打牌、吃、碰、胡時念出來</label>
+  <p class="vp-row vp-voice">聲音：<b id="vpVoiceName"></b></p>
+  <label class="vp-row">語速<input type="range" id="vpRate" min="0.8" max="1.5" step="0.05"><span id="vpRateVal"></span></label>
+  <button id="vpTest" type="button">▶ 試聽</button>
+  <p id="vpTip" class="hint"></p>
+</div>
+
+<!-- 玩家說話的對話框 (打牌、吃、碰、槓、胡) -->
+<div id="sayLayer" aria-live="polite"></div>
+
+<!-- 確認視窗 (取代瀏覽器內建的 confirm) -->
+<div id="confirmModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="box">
+    <h2 id="confirmTitle"></h2>
+    <div id="confirmBody"></div>
+    <div class="row confirmBtns">
+      <button id="confirmCancel" type="button" class="ghost"></button>
+      <button id="confirmOk" type="button"></button>
+    </div>
+  </div>
+</div>
+
+<div id="lobby" class="panel hidden">
+  <div class="hallhead">
+    <h2><span id="lobbyRoom"></span></h2>
+    <button id="leaveBtn" class="ghost">離開房間</button>
+  </div>
+  <div id="lobbySeats"></div>
+  <div class="row">
+    <button id="addBotBtn">加入電腦</button>
+    <button id="startBtn">開始遊戲</button>
+  </div>
+  <p class="hint">朋友在大廳點選這個房間即可加入。人數不足可加入電腦。</p>
+</div>
+
+<div id="game" class="hidden">
+  <div id="topbar"></div>
+  <div id="table">
+    <div class="seat top" id="seat2"></div>
+    <div class="seat left" id="seat3"></div>
+    <div id="center">
+      <div id="info"></div>
+      <div class="pool p2" id="pool2"></div>
+      <div class="pool p3" id="pool3"></div>
+      <div class="pool p1" id="pool1"></div>
+      <div class="pool p0" id="pool0"></div>
+    </div>
+    <div class="seat right" id="seat1"></div>
+  </div>
+  <div id="me">
+    <div id="myMelds" class="row"></div>
+    <div id="tingBar"></div>
+    <div id="actions" class="row"></div>
+    <div id="myHand" class="row"></div>
+  </div>
+  <div id="chatbox">
+    <div class="chathead"><span>💬 聊天</span><button id="chatClose" class="ghost small" type="button">✕ 關閉</button></div>
+    <div id="chatlog"></div>
+    <form id="chatForm"><input id="chatInput" maxlength="100" placeholder="聊天..." autocomplete="off"><button>送出</button></form>
+  </div>
+  <div id="resultModal" class="hidden"></div>
+</div>
+<script src="client.js"></script>
+</body>
+</html>

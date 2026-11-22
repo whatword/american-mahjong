@@ -1,0 +1,979 @@
+'use strict';
+const NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+const SUIT = ['萬', '筒', '條'];
+const HONOR = ['東', '南', '西', '北', '中', '發', '白'];
+const FLOWER = ['春', '夏', '秋', '冬', '梅', '蘭', '菊', '竹'];
+const WINDS = ['東', '南', '西', '北'];
+const $ = (id) => document.getElementById(id);
+
+let swapSel = [], swapPicks = {}, swapKey = '';
+let ws, S = null, selected = null, tick = null; // selected: 手牌位置 (index)
+
+// 牌面圖：萬筒條與字牌用 FluffyStuff 圖組 (公有領域)，花牌為自製；圖案疊在 Front.svg 上
+// 白板用自製的藍框 (HakuFrame)，原圖組的白板是全白，容易看成空白牌
+const HONOR_FILE = ['Ton', 'Nan', 'Shaa', 'Pei', 'Chun', 'Hatsu', 'HakuFrame'];
+const FLOWER_FILE = ['Spring', 'Summer', 'Autumn', 'Winter', 'Plum', 'Orchid', 'Chrysanthemum', 'Bamboo'];
+function tileFile(t) {
+  if (t < 9) return 'Man' + (t + 1);
+  if (t < 18) return 'Pin' + (t - 8);
+  if (t < 27) return 'Sou' + (t - 17);
+  if (t < 34) return HONOR_FILE[t - 27];
+  return FLOWER_FILE[t - 34];
+}
+
+// 牌的大小一律由 font-size 決定 (寬 0.825em、高 1.1em)，所以各處原本的 font-size 設定都照樣有效
+function tileEl(t, extra = '') {
+  const d = document.createElement('div');
+  d.className = `tile ${t >= 34 ? 'f' : ''} ${extra}`;
+  d.style.backgroundImage = `url(tiles/${tileFile(t)}.svg), url(tiles/Front.svg)`;
+  d.title = tileName(t);
+  return d;
+}
+
+// 預先載入所有牌面，避免第一次出現時閃爍
+for (const f of ['Front', 'BackGreen', ...HONOR_FILE, ...FLOWER_FILE, ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => ['Man' + n, 'Pin' + n, 'Sou' + n])]) {
+  new Image().src = `tiles/${f}.svg`;
+}
+
+function tileName(t) {
+  if (t < 27) return NUM[t % 9] + SUIT[Math.floor(t / 9)];
+  if (t < 34) return ['東', '南', '西', '北', '紅中', '發財', '白板'][t - 27];
+  return FLOWER[t - 34];
+}
+
+// ---------- 畫面差異更新 ----------
+// 重畫時不整排刪掉重建，而是沿用原本的元素、只改有變的屬性。
+// 牌面是 SVG 背景圖，元素一旦重建，手機瀏覽器會重新繪製而閃一下；沿用元素就不會。
+function morph(o, n) {
+  if (o.nodeType === 3) { if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue; return; }
+  for (const a of [...o.attributes]) if (!n.hasAttribute(a.name)) o.removeAttribute(a.name);
+  for (const a of n.attributes) if (o.getAttribute(a.name) !== a.value) o.setAttribute(a.name, a.value);
+  o.onclick = n.onclick;
+  patchChildren(o, [...n.childNodes]);
+}
+function patchChildren(parent, nodes) {
+  const old = [...parent.childNodes];
+  nodes.forEach((n, k) => {
+    const o = old[k];
+    if (!o) parent.appendChild(n);
+    else if (o.nodeType === n.nodeType && o.nodeName === n.nodeName) morph(o, n);
+    else parent.replaceChild(n, o);
+  });
+  for (let k = nodes.length; k < old.length; k++) old[k].remove();
+}
+
+function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+
+// ---------- 登入 ----------
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+let me = null, hall = null, kicked = false, clientVersion = null;
+$('name').value = localStorage.getItem('mj_name') || '';
+$('email').value = localStorage.getItem('mj_email') || '';
+
+function show(id) {
+  for (const k of ['login', 'hall', 'lobby', 'game']) $(k).classList.toggle('hidden', k !== id);
+}
+
+$('loginForm').onsubmit = (e) => {
+  e.preventDefault();
+  const name = $('name').value.trim();
+  const email = $('email').value.trim().toLowerCase();
+  if (!name) return ($('loginErr').textContent = '請輸入暱稱');
+  if (!EMAIL_RE.test(email)) return ($('loginErr').textContent = '帳號必須是有效的 email');
+  $('loginErr').textContent = '';
+  connect(name, email);
+};
+
+$('logoutBtn').onclick = () => {
+  localStorage.removeItem('mj_email');
+  me = null;
+  if (ws) { ws.onclose = null; ws.close(); }
+  show('login');
+};
+
+function connect(name, email) {
+  if (ws) { ws.onclose = null; ws.close(); }
+  kicked = false;
+  $('loginBtn').disabled = true;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}`);
+  ws.onopen = () => send({ type: 'login', name, email });
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'loggedIn') {
+      // 重新連線時發現網頁程式已更新 (例如伺服器改版重啟)：重新整理頁面載入新版，之後會自動登入
+      if (clientVersion && m.version && m.version !== clientVersion) { location.reload(); return; }
+      clientVersion = m.version;
+      me = m.me;
+      localStorage.setItem('mj_name', me.name);
+      localStorage.setItem('mj_email', me.email);
+      $('loginBtn').disabled = false;
+    } else if (m.type === 'loginError') {
+      $('loginErr').textContent = m.text;
+      $('loginBtn').disabled = false;
+      ws.onclose = null;
+      ws.close();
+    } else if (m.type === 'hall') { S = null; hall = m; renderHall(); }
+    else if (m.type === 'state') { S = m; render(); }
+    else if (m.type === 'toast') toast(m.text);
+    else if (m.type === 'say') showSay(m);
+    else if (m.type === 'kicked') kicked = true;
+  };
+  ws.onclose = () => {
+    S = null;
+    $('loginBtn').disabled = false;
+    show('login');
+    $('loginErr').textContent = kicked ? '此帳號已在其他視窗登入' : '連線中斷，請重新登入';
+  };
+}
+
+// 重新整理頁面時，用上次的暱稱與帳號自動登入
+if ($('name').value && EMAIL_RE.test($('email').value)) connect($('name').value.trim(), $('email').value.trim().toLowerCase());
+
+// ---------- 大廳 ----------
+function renderHall() {
+  show('hall');
+  $('hallMe').textContent = `${me.name}（${me.email}）`;
+  const list = $('roomList');
+  list.innerHTML = '';
+  $('hallCount').textContent = `房間 ${hall.rooms.length} / ${hall.max}`;
+  renderBoard(hall.board || []);
+  $('createBtn').disabled = hall.rooms.length >= hall.max;
+  if (!hall.rooms.length) {
+    list.innerHTML = '<p class="hint">目前沒有房間，按「開新房間」建立一桌。</p>';
+    return;
+  }
+  for (const r of hall.rooms) {
+    const card = document.createElement('div');
+    card.className = 'roomcard' + (r.mine ? ' mine' : '');
+    const status = r.state === 'playing' ? '<span class="tag playing">遊戲中</span>' : '<span class="tag waiting">等待中</span>';
+    const seats = r.players.map((n) => `<li>${n ? escapeHtml(n) : '<em>空位</em>'}</li>`).join('');
+    card.innerHTML = `<div class="rtitle">${escapeHtml(r.title)} ${status}</div><div class="rcount">${r.count} / 4 人</div><ul>${seats}</ul>`;
+    const b = document.createElement('button');
+    if (r.mine) b.textContent = '回到房間';
+    else if (r.state === 'playing') { b.textContent = '遊戲中'; b.disabled = true; }
+    else if (r.count >= 4) { b.textContent = '已滿'; b.disabled = true; }
+    else b.textContent = '加入';
+    b.onclick = () => send({ type: 'joinRoom', room: r.id });
+    card.appendChild(b);
+    list.appendChild(card);
+  }
+}
+$('createBtn').onclick = () => send({ type: 'create' });
+
+// ---------- 計分板 ----------
+const money = (n) => (n > 0 ? '+' : '') + n.toLocaleString();
+const sign = (n) => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
+// 金額拆分：跟玩家 / 跟電腦
+const split = (p) => `<div class="msplit"><span>玩家 <i class="${sign(p.moneyVsHuman)}">${money(p.moneyVsHuman)}</i></span><span>電腦 <i class="${sign(p.moneyVsBot)}">${money(p.moneyVsBot)}</i></span>${p.moneyLegacy ? `<span>舊 <i class="${sign(p.moneyLegacy)}">${money(p.moneyLegacy)}</i></span>` : ''}</div>`;
+const pctText = (r) => (r == null ? '—' : (r * 100).toFixed(1) + '%');
+// 真人顯示「暱稱(email)」，暱稱為該 email 最新登入時的暱稱
+const who = (p) => `${p.bot ? '🤖 ' : ''}${escapeHtml(p.name)}${p.email ? `<span class="em">(${escapeHtml(p.email)})</span>` : ''}${p.you ? '（你）' : ''}`;
+
+function renderBoard(list) {
+  const podium = $('podium');
+  const rest = $('rankList');
+  podium.innerHTML = '';
+  rest.innerHTML = '';
+  if (!list.length) {
+    podium.innerHTML = '<p class="hint">還沒有任何戰績，打完一局後就會出現。</p>';
+    return;
+  }
+  // 頒獎台：第二名在左、第一名在中間最高、第三名在右
+  const medals = ['🥇', '🥈', '🥉'];
+  for (const rank of [1, 0, 2]) {
+    const p = list[rank];
+    const col = document.createElement('div');
+    col.className = `pcol r${rank + 1}`;
+    if (p) {
+      col.innerHTML = `<div class="pcard${p.you ? ' you' : ''}"><div class="medal">${medals[rank]}</div>` +
+        `<div class="pname">${who(p)}</div><div class="pmoney ${p.money >= 0 ? 'pos' : 'neg'}">${money(p.money)}</div>${split(p)}</div>` +
+        `<div class="step">${rank + 1}</div>`;
+      col.querySelector('.pcard').onclick = () => showStats(p, rank + 1);
+    } else col.innerHTML = '<div class="pcard empty"></div><div class="step"></div>';
+    podium.appendChild(col);
+  }
+  list.slice(3).forEach((p, k) => {
+    const row = document.createElement('div');
+    row.className = 'rankrow' + (p.you ? ' you' : '');
+    row.innerHTML = `<span class="rk">${k + 4}</span><span class="nm">${who(p)}</span><span class="rmoney"><b class="${p.money >= 0 ? 'pos' : 'neg'}">${money(p.money)}</b>${split(p)}</span>`;
+    row.onclick = () => showStats(p, k + 4);
+    rest.appendChild(row);
+  });
+}
+
+function showStats(p, rank) {
+  const m = $('statModal');
+  const vs = (o) => `${pctText(o.rate)} <small>（${o.w} 勝 ${o.l} 負）</small>`;
+  m.innerHTML = `<div class="box">
+    <h2>第 ${rank} 名　${who(p)}</h2>
+    <div class="statgrid">
+      <div class="wide"><span>總金額 = 跟玩家輸贏 + 跟電腦輸贏</span>
+        <b class="${p.money >= 0 ? 'pos' : 'neg'}">${money(p.money)}</b>
+        <small>= 跟玩家 <i class="${sign(p.moneyVsHuman)}">${money(p.moneyVsHuman)}</i> ＋ 跟電腦 <i class="${sign(p.moneyVsBot)}">${money(p.moneyVsBot)}</i>${p.moneyLegacy ? ` ＋ 舊紀錄（未分類） <i class="${sign(p.moneyLegacy)}">${money(p.moneyLegacy)}</i>` : ''}</small></div>
+      <div><span>總勝率</span><b>${pctText(p.winRate)} <small>（${p.wins} 胡 / ${p.hands} 局）</small></b></div>
+      <div><span>跟玩家勝率</span><b>${vs(p.vsHuman)}</b></div>
+      <div><span>跟電腦勝率</span><b>${vs(p.vsBot)}</b></div>
+      <div><span>自摸次數</span><b>${p.selfDraws}</b></div>
+      <div><span>放槍次數</span><b>${p.dealIns}</b></div>
+    </div>
+    <p class="hint">總勝率 = 胡牌局數 ÷ 參與局數。跟玩家／電腦勝率 = 和真人／電腦之間有輸贏的次數中，自己贏的比例（胡牌時贏每位付錢的人，付錢時輸給胡牌的人）。</p>
+    <button id="statClose">關閉</button>
+  </div>`;
+  m.classList.remove('hidden');
+  $('statClose').onclick = () => m.classList.add('hidden');
+  m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+}
+$('leaveBtn').onclick = async () => {
+  const yes = await confirmDialog({
+    title: '要離開房間嗎？',
+    body: '<p>遊戲還沒開始，離開後會<b>讓出座位</b>。</p><p>你是最後一位玩家的話，房間會被關閉。</p>',
+    ok: '離開房間',
+    cancel: '留在房間',
+    danger: true,
+  });
+  if (yes) send({ type: 'leave' });
+};
+
+// 確認視窗：回傳 Promise<boolean>。點背景、按 Esc 都算取消
+function confirmDialog({ title, body, ok = '確定', cancel = '取消', danger = false }) {
+  const m = $('confirmModal');
+  $('confirmTitle').textContent = title;
+  $('confirmBody').innerHTML = body;
+  $('confirmOk').textContent = ok;
+  $('confirmOk').className = danger ? 'danger' : '';
+  $('confirmCancel').textContent = cancel;
+  m.classList.remove('hidden');
+  $('confirmCancel').focus();
+  return new Promise((resolve) => {
+    const done = (v) => {
+      m.classList.add('hidden');
+      document.removeEventListener('keydown', onKey);
+      m.onclick = $('confirmOk').onclick = $('confirmCancel').onclick = null;
+      resolve(v);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') done(false); if (e.key === 'Enter') done(true); };
+    document.addEventListener('keydown', onKey);
+    $('confirmOk').onclick = () => done(true);
+    $('confirmCancel').onclick = () => done(false);
+    m.onclick = (e) => { if (e.target === m) done(false); };
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ---------- 渲染 ----------
+function render() {
+  $('login').classList.add('hidden');
+  $('hall').classList.add('hidden');
+  if (S.state === 'lobby') {
+    $('game').classList.add('hidden');
+    $('lobby').classList.remove('hidden');
+    renderLobby();
+  } else {
+    $('lobby').classList.add('hidden');
+    $('game').classList.remove('hidden');
+    renderGame();
+  }
+}
+
+function renderLobby() {
+  $('lobbyRoom').textContent = S.title;
+  const box = $('lobbySeats');
+  box.innerHTML = '';
+  const isHost = S.host === S.you;
+  S.seats.forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = 'lseat';
+    d.innerHTML = `<span>座位 ${i + 1}：${s ? s.name + (i === S.you ? '（你）' : '') + (i === S.host ? ' 👑' : '') : '<em>空位</em>'}</span>`;
+    if (s && s.bot && isHost) {
+      const b = document.createElement('button');
+      b.textContent = '移除';
+      b.onclick = () => send({ type: 'removebot', seat: i });
+      d.appendChild(b);
+    }
+    box.appendChild(d);
+  });
+  const full = S.seats.every(Boolean);
+  $('addBotBtn').disabled = !isHost || full;
+  $('startBtn').disabled = !isHost || !full;
+  $('startBtn').textContent = isHost ? '開始遊戲' : '等待房主開始';
+}
+$('addBotBtn').onclick = () => send({ type: 'addbot' });
+$('startBtn').onclick = () => send({ type: 'start' });
+
+// 蓋著的牌：用牌背圖，大小跟同位置的正面牌一致
+function backEl(extra = '') {
+  const e = document.createElement('div');
+  e.className = 'tile back-t ' + extra;
+  return e;
+}
+
+function meldEl(m) {
+  const d = document.createElement('div');
+  d.className = 'meld';
+  m.tiles.forEach((t, k) => {
+    // 暗槓：對手收到的是 null，全部蓋牌；自己看得到牌面，兩端仍以蓋牌表示
+    if (t === null || (m.type === 'angang' && (k === 0 || k === 3))) {
+      d.appendChild(backEl());
+      return;
+    }
+    const e = tileEl(t, 'sm' + (m.claimed === k ? ' claimed' : ''));
+    d.appendChild(e);
+  });
+  return d;
+}
+
+// 牌桌角色前方蓋著的 3 張牌
+const coverKeys = {};
+function coverEl(i, pickable) {
+  const d = document.createElement('div');
+  d.className = 'cover';
+  const cov = S.seats[i].cover;
+  if (!cov) { delete coverKeys[i]; return d; }
+  // 蓋牌剛出現 (伺服器洗牌一次) → 播放洗牌動畫；開始取牌後不再播放
+  const key = `${S.handNo}-${S.swapLeft}`;
+  if (coverKeys[i] !== key) { coverKeys[i] = key; d.classList.add('shuffling'); }
+  cov.forEach((has, k) => {
+    const t = backEl((has ? '' : ' gone') + (pickable && has && i !== S.you ? ' pickable' : '') + (swapPicks[i] === k ? ' sel' : ''));
+    if (pickable && has && i !== S.you) t.onclick = () => { swapPicks[i] = swapPicks[i] === k ? undefined : k; renderGame(); };
+    d.appendChild(t);
+  });
+  return d;
+}
+
+function renderGame() {
+  updateUnread();
+  const me = S.you;
+  const swapMode = S.phase === 'swapSelect' && !S.seats[me].confirmed; // 我正在選要蓋的 3 張牌
+  const pickMode = S.phase === 'swapPick' && S.turn === me; // 輪到我取牌
+  const key = `${S.handNo}-${S.phase}-${S.swapLeft}-${pickMode ? S.turn : ''}`;
+  if (key !== swapKey) { swapKey = key; swapSel = []; swapPicks = {}; }
+  // 換牌取牌：某一家只剩一張蓋牌可取時，直接幫玩家選好
+  const forcedPicks = [];
+  if (pickMode) {
+    for (let p = 0; p < 4; p++) {
+      if (p === me || !S.seats[p].cover) continue;
+      const left = S.seats[p].cover.map((has, k) => (has ? k : -1)).filter((k) => k >= 0);
+      if (left.length === 1) { swapPicks[p] = left[0]; forcedPicks.push(p); }
+    }
+  }
+  const rel = (k) => (me + k) % 4; // k: 0 自己, 1 下家(右), 2 對家, 3 上家(左)
+
+  $('topbar').innerHTML = `<button id="backHallBtn" class="ghost small">回大廳</button><span>${S.title}</span><span>第 ${S.jiang} 將 ・ ${WINDS[S.round]}風圈 ・ 第 ${S.handNo} 局</span>` +
+    `<span>莊家：${S.seats[S.dealer].name}${S.streak ? ` 連${S.streak}拉${S.streak}` : ''}</span>` +
+    (S.breakInfo ? `<span class="opt2">開門：${S.seats[S.breakInfo.owner].name} 牌牆第 ${S.breakInfo.stack} 墩</span>` : '') +
+    `<span>剩餘牌數：${S.wall}</span><span class="opt">底${S.base} / 每台${S.taiValue}</span>` +
+    (VOICE_OK ? (() => { const on = voiceOn && !!zhVoice; return `<button id="voiceToggle" class="ghost small${on ? ' on' : ''}" title="打牌、吃、碰、胡時念出來" aria-label="${on ? '語音開' : '語音關'}">${on ? '🔊<span class="lbl"> 語音開</span>' : '🔇<span class="lbl"> 語音關</span>'}</button>`; })() : '') +
+    `<button id="chatToggle" class="ghost small" aria-label="聊天">💬<span class="lbl"> 聊天</span>${chatUnread ? `<b class="dot">${chatUnread}</b>` : ''}</button>`;
+  if (VOICE_OK) $('voiceToggle').onclick = () => toggleVoicePanel();
+  $('chatToggle').onclick = () => {
+    document.body.classList.toggle('chat-open');
+    chatUnread = 0;
+    chatSeen = S.chat.length;
+    renderGame();
+  };
+
+  $('backHallBtn').onclick = async () => {
+    const alone = S.seats.every((x, k) => k === S.you || !x || x.bot || !x.online);
+    const yes = await confirmDialog({
+      title: '要離開牌局嗎？',
+      // 只剩自己一位真人時，離開房間就會直接關閉
+      body: alone
+        ? '<p class="warn">目前只有你一位玩家，離開後<b>房間會直接關閉</b>，這場牌局就結束了。</p>'
+        : '<p>離開後由<b>電腦代打</b>你的座位，牌局會繼續進行。</p><p>之後可以從大廳點「<b>回到房間</b>」，回到原本的座位接著打。</p>',
+      ok: '回大廳',
+      cancel: '繼續打牌',
+      danger: true,
+    });
+    if (yes) send({ type: 'leave' });
+  };
+  for (let k = 0; k < 4; k++) {
+    const i = rel(k);
+    const s = S.seats[i];
+    const wind = WINDS[(i - S.dealer + 4) % 4];
+    if (k !== 0) {
+      const seatEl = $('seat' + k);
+      seatEl.className = 'seat ' + ['', 'right', 'top', 'left'][k] + (S.phase !== 'over' && S.turn === i ? ' turn' : '');
+      const el = document.createElement('div'); // 先畫在暫存容器，最後差異更新到畫面
+      const nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.innerHTML = '';
+      nm.append(`${wind} ${s.name}${s.online ? '' : '(離線)'}${i === S.dealer ? ' 莊' : ''}`);
+      if (s.migi) nm.appendChild(Object.assign(document.createElement('span'), { className: 'migi-badge', textContent: 'MIGI' }));
+      el.appendChild(nm);
+      const sc = document.createElement('div');
+      sc.textContent = `💰 ${S.scores[i]}`;
+      el.appendChild(sc);
+      const hc = document.createElement('div');
+      hc.className = 'hcount';
+      hc.textContent = `🀫 ${s.handCount} 張`;
+      el.appendChild(hc);
+      const backs = document.createElement('div');
+      backs.className = 'backs' + (S.phase === 'over' && s.hand ? ' revealed' : '');
+      if (S.phase === 'over' && s.hand) s.hand.forEach((t) => backs.appendChild(tileEl(t, 'sm')));
+      else for (let n = 0; n < s.handCount; n++) {
+        const b = document.createElement('div');
+        b.className = 'back';
+        backs.appendChild(b);
+      }
+      el.appendChild(backs);
+      const ml = document.createElement('div');
+      ml.className = 'melds';
+      s.melds.forEach((m) => ml.appendChild(meldEl(m)));
+      el.appendChild(ml);
+      const fl = document.createElement('div');
+      fl.className = 'flw';
+      s.flowers.forEach((t) => fl.appendChild(tileEl(t, 'sm')));
+      el.appendChild(fl);
+      patchChildren(seatEl, [...el.childNodes]);
+    }
+    // 牌河
+    const pool = document.createElement('div');
+    // 換牌時蓋著的 3 張放在各家海底
+    // 只剩一張的那家已自動選好，不能取消
+    if (s.cover) pool.appendChild(coverEl(i, pickMode && i !== me && !forcedPicks.includes(i)));
+    s.discards.forEach((t, n) => {
+      const latest = S.last && !S.last.rob && S.phase === 'claim' && S.last.from === i && n === s.discards.length - 1;
+      pool.appendChild(tileEl(t, 'sm' + (latest ? ' latest' : '')));
+    });
+    patchChildren($('pool' + k), [...pool.childNodes]);
+  }
+
+  // 中央資訊
+  let info = '';
+  if (S.phase === 'discard') info = S.turn === me ? '<div class="big">輪到你出牌</div>' : `<div>等待 ${S.seats[S.turn].name} 出牌</div>`;
+  else if (S.phase === 'claim') info = `<div>${S.seats[S.last.from].name} ${S.last.rob ? '加槓' : '打出'} <b>${tileName(S.last.tile)}</b></div>` +
+    (S.last.rob ? '<div>可搶槓</div>' : '') +
+    (S.waiting && S.waiting.length ? `<div>等待 ${S.waiting.map((p) => S.seats[p].name).join('、')}</div>` : '');
+  else if (S.phase === 'dice' && S.dice) info = diceInfo();
+  else if (S.phase === 'seatPick' && S.seatPick) info = '';
+  else if (S.phase.startsWith('swap')) {
+    const left = `<div>還可換 ${S.swapLeft} 次</div>`;
+    const done = S.seats.filter((s) => s.confirmed).length;
+    if (S.phase === 'swapAsk') info = S.dealer === me ? `<div class="big">你是莊家，要換牌嗎？</div>${left}` : `<div>莊家 ${S.seats[S.dealer].name} 考慮換牌中</div>${left}`;
+    else if (S.phase === 'swapSelect') info = `<div class="big">換牌：選 3 張蓋牌</div><div>已確定 ${done}/4 人</div>`;
+    else info = pickMode ? `<div class="big">輪到你取牌</div><div>從其他三家各取一張</div>` : `<div>輪到 ${S.seats[S.turn].name} 取牌</div>`;
+  }
+  info += `<div class="timer" id="timer"></div>`;
+  $('info').innerHTML = info;
+  if (S.phase === 'seatPick' && S.seatPick) renderSeatPick($('info'));
+
+  // 我的牌
+  const wind = WINDS[(me - S.dealer + 4) % 4];
+  const myTurn = S.phase === 'discard' && S.turn === me;
+  const mm = document.createElement('div');
+  mm.innerHTML = `<span style="margin-right:10px">${wind} ${S.seats[me].name}${me === S.dealer ? ' 莊' : ''} 💰${S.scores[me]}</span>` +
+    (S.seats[me].migi ? '<span class="migi-badge">MIGI</span>' : '');
+  S.seats[me].melds.forEach((m) => mm.appendChild(meldEl(m)));
+  if (S.myTaken && S.myTaken.length) {
+    const tk = document.createElement('span');
+    tk.style.cssText = 'display:flex;gap:2px;margin-left:10px;align-items:center';
+    tk.append('取得：');
+    S.myTaken.forEach((t) => tk.appendChild(tileEl(t, 'sm')));
+    mm.appendChild(tk);
+  }
+  const fl = document.createElement('span');
+  fl.style.cssText = 'display:flex;gap:2px;margin-left:10px';
+  S.seats[me].flowers.forEach((t) => fl.appendChild(tileEl(t, 'sm')));
+  mm.appendChild(fl);
+  patchChildren($('myMelds'), [...mm.childNodes]);
+
+  const handEl = $('myHand');
+  handEl.className = 'row' + (myTurn || swapMode ? '' : ' disabled');
+  const hand = document.createElement('div');
+  const addTile = (t, cls, idx) => {
+    const e = tileEl(t, cls);
+    // 選取中的牌：上浮、黃框發光，上方標示下一步要做什麼
+    const tag = (text) => e.appendChild(Object.assign(document.createElement('span'), { className: 'seltag', textContent: text }));
+    if (myTurn && selected === idx) { e.classList.add('sel'); tag('再點一次打出'); }
+    if (swapMode && swapSel.includes(idx)) { e.classList.add('sel'); tag('蓋牌'); }
+    e.onclick = () => {
+      if (swapMode) {
+        const p = swapSel.indexOf(idx);
+        if (p >= 0) swapSel.splice(p, 1);
+        else if (swapSel.length < 3) swapSel.push(idx);
+        renderGame();
+        return;
+      }
+      if (!myTurn) return;
+      if (S.actions && S.actions.locked && idx !== 'drawn') return toast('MIGI 中只能打出摸進的牌');
+      if (S.actions && S.actions.forbid && S.actions.forbid.includes(t)) return toast(`剛吃碰完，不能馬上打出 ${tileName(t)}`);
+      if (selected === idx) { selected = null; send({ type: 'discard', tile: t }); }
+      else { selected = idx; renderGame(); }
+    };
+    hand.appendChild(e);
+  };
+  // 打出後能聽牌的牌，在牌上加小標記
+  const tingable = (t) => (myTurn && S.ting && S.ting.byDiscard && S.ting.byDiscard[t] ? ' tingable' : '');
+  // MIGI 中只能摸打：手上其他牌變暗、不能點
+  const locked = myTurn && S.actions && S.actions.locked ? ' locked' : '';
+  // 剛吃/碰完，不能馬上打出的牌 (變暗、不能點)
+  const forbid = new Set(myTurn && S.actions && S.actions.forbid ? S.actions.forbid : []);
+  // 剛換進來的牌加上「換」標記 (同樣的牌換進幾張就標幾張)
+  const swapLeft = {};
+  for (const t of S.swapIn || []) swapLeft[t] = (swapLeft[t] || 0) + 1;
+  const swapped = (t) => (swapLeft[t] > 0 ? (swapLeft[t]--, ' swapin') : '');
+  (S.hand || []).forEach((t, k) => addTile(t, tingable(t) + locked + swapped(t) + (forbid.has(t) ? ' forbid' : ''), k));
+  if (S.drawn != null) addTile(S.drawn, 'drawn' + tingable(S.drawn) + swapped(S.drawn), 'drawn');
+  patchChildren(handEl, [...hand.childNodes]);
+  // 有選牌時，其他牌稍微變暗，讓選到的牌更突出
+  handEl.classList.toggle('has-sel', !!handEl.querySelector('.tile.sel'));
+  if (!myTurn) selected = null;
+
+  renderTing(myTurn);
+  renderActions();
+  renderChat();
+  renderResult();
+  startTimer();
+}
+
+// 聽牌提示：聽哪些牌、各剩幾張 (只扣掉自己看得到的牌)
+function renderTing(myTurn) {
+  const bar = $('tingBar');
+  bar.innerHTML = '';
+  const t = S.ting;
+  if (!t) return;
+  const show = (label, waits) => {
+    const total = waits.reduce((n, w) => n + w.left, 0);
+    const d = document.createElement('div');
+    d.className = 'ting';
+    d.append(label);
+    for (const w of waits) {
+      const cell = document.createElement('span');
+      cell.className = 'tw' + (w.left === 0 ? ' dead' : '');
+      cell.appendChild(tileEl(w.tile, 'sm'));
+      // 剩幾張 + 預估台數 (胡 = 別人打出、摸 = 自摸)
+      const info = document.createElement('span');
+      info.className = 'tinfo';
+      info.innerHTML = `<span>${w.left}張</span><span class="ttai">胡${w.ron}・摸${w.tsumo}台</span>`;
+      cell.appendChild(info);
+      d.appendChild(cell);
+    }
+    const sum = document.createElement('span');
+    sum.className = 'tsum';
+    sum.textContent = (total ? `共 ${total} 張` : '已無牌可胡') + (t.mult > 1 ? `・骰規豹子 (底+台)×${t.mult}` : '');
+    d.appendChild(sum);
+    bar.appendChild(d);
+  };
+  if (t.waits) {
+    show(t.noRon ? '聽牌 (過水中，暫時不能胡)：' : '聽牌：', t.waits);
+    if (t.noRon) bar.firstChild.classList.add('noron');
+    return;
+  }
+  if (!myTurn || !t.byDiscard) return;
+  const selTile = selected === 'drawn' ? S.drawn : selected != null ? S.hand[selected] : null;
+  if (selTile != null && t.byDiscard[selTile]) {
+    // 過水中：打出的牌如果是自己聽的牌，打完還在過水
+    const stillNoRon = t.noRon && t.byDiscard[selTile].some((w) => w.tile === selTile);
+    show(`打出「${tileName(selTile)}」聽${t.noRon ? (stillNoRon ? '（打這張仍在過水中）' : '（打這張可解除過水）') : ''}：`, t.byDiscard[selTile]);
+    if (stillNoRon) bar.firstChild.classList.add('noron');
+    return;
+  }
+  // 沒選牌時不另外佔一行，▲ 的說明併到下方操作提示裡
+}
+
+function btn(text, cls, fn) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  if (cls) b.className = cls;
+  b.onclick = fn;
+  actBox.appendChild(b);
+  return b;
+}
+
+let actBox = null;
+// 先畫到暫存容器，內容沒變就保留舊按鈕，避免點擊途中按鈕被重建而失效
+function renderActions() {
+  const real = $('actions');
+  actBox = document.createElement('div');
+  renderActionsInto(actBox);
+  if (actBox.innerHTML === real.innerHTML) return;
+  real.replaceChildren(...actBox.childNodes);
+}
+
+function renderActionsInto(box) {
+  if (S.phase === 'seatPick') return;
+  if (S.phase === 'dice') {
+    if (S.dice && S.dice.thrower === S.you && !S.dice.values) btn('🎲 擲骰子', 'hu', () => send({ type: 'roll' }));
+    return;
+  }
+  if (S.phase === 'swapAsk') {
+    if (S.dealer !== S.you) return;
+    btn(`開始換牌（還可 ${S.swapLeft} 次）`, '', () => send({ type: 'swapstart' }));
+    btn('不換了，開始打牌', '', () => send({ type: 'skipswap' }));
+    return;
+  }
+  if (S.phase === 'swapSelect') {
+    if (S.seats[S.you].confirmed) { box.innerHTML = '<span class="hint">已確定，等待其他玩家…</span>'; return; }
+    const b = btn(`確定（已選 ${swapSel.length}/3 張）`, '', () => send({ type: 'cover', tiles: swapSel.map((k) => S.hand[k]) }));
+    b.disabled = swapSel.length !== 3;
+    return;
+  }
+  if (S.phase === 'swapPick') {
+    if (S.turn !== S.you) { box.innerHTML = `<span class="hint">等待 ${S.seats[S.turn].name} 取牌…</span>`; return; }
+    const others = [0, 1, 2, 3].filter((p) => p !== S.you);
+    const picked = others.filter((p) => swapPicks[p] !== undefined).length;
+    const forced = others.filter((p) => S.seats[p].cover && S.seats[p].cover.filter(Boolean).length === 1);
+    if (forced.length === 3) {
+      // 每家都只剩一張：伺服器會自動取牌，不用按
+      box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: '每家都只剩一張，已自動幫你取牌…' }));
+      return;
+    }
+    const b = btn(`確定取牌（${picked}/3）`, '', () => send({ type: 'swappick', picks: swapPicks }));
+    b.disabled = picked !== 3;
+    const tip = forced.length ? `${forced.map((p) => S.seats[p].name).join('、')} 只剩一張，已幫你選好；` : '';
+    box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: tip + '在其他三家面前各點一張蓋著的牌' }));
+    return;
+  }
+  if (S.phase === 'discard' && S.turn === S.you && S.actions) {
+    const a = S.actions;
+    if (a.hu) btn('自摸', 'hu', () => send({ type: 'hu' }));
+    if (a.locked) {
+      if (!a.hu) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中：點兩下摸進的牌打出' }));
+      return;
+    }
+    if (a.migi && a.migi.length) {
+      const selTile = selected === 'drawn' ? S.drawn : selected != null ? S.hand[selected] : null;
+      const ok = selTile != null && a.migi.includes(selTile);
+      const b = btn(ok ? `MIGI（打出 ${tileName(selTile)}）` : 'MIGI', 'migi', () => send({ type: 'discard', tile: selTile, migi: true }));
+      b.disabled = !ok;
+      if (!ok) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: '可以 MIGI！先點選要打出的牌' }));
+    }
+    a.angang.forEach((t) => btn(`暗槓 ${tileName(t)}`, '', () => send({ type: 'angang', tile: t })));
+    a.jiagang.forEach((t) => btn(`加槓 ${tileName(t)}`, '', () => send({ type: 'jiagang', tile: t })));
+    if (!box.children.length) {
+      const tingTip = S.ting && S.ting.byDiscard ? '・▲ 打出就聽牌，點選看聽什麼' : '';
+      box.innerHTML = `<span class="hint">點兩下打出${tingTip}</span>`;
+    }
+  } else if (S.phase === 'claim' && S.claim && !S.claim.resp) {
+    const o = S.claim.opts;
+    if (o.hu) btn('胡', 'hu', () => send({ type: 'hu' }));
+    const opt = (label, tiles, fn, mark) => {
+      const d = document.createElement('div');
+      d.className = 'chiopt';
+      const l = document.createElement('span');
+      l.textContent = label;
+      d.appendChild(l);
+      tiles.forEach((t, k) => d.appendChild(tileEl(t, 'sm' + (k === mark ? ' claimed' : ''))));
+      d.onclick = fn;
+      box.appendChild(d);
+    };
+    const lt = S.last.tile;
+    if (o.kong) opt('槓', [lt, lt, lt, lt], () => send({ type: 'kong' }));
+    if (o.pong) opt('碰', [lt, lt, lt], () => send({ type: 'pong' }));
+    // 吃：被吃的牌放中間
+    o.chi.forEach((p) => { const [a, b] = p.slice().sort((x, y) => x - y); opt('吃', [a, lt, b], () => send({ type: 'chi', tiles: p }), 1); });
+    if (o.forced) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中必須胡牌' }));
+    else btn('過', '', () => send({ type: 'pass' }));
+  } else if (S.phase === 'claim' && S.claim && S.claim.resp) {
+    box.innerHTML = '<span class="hint">已選擇，等待其他玩家…</span>';
+  }
+}
+
+// 手機聊天視窗收起時，計算未讀訊息數
+let chatSeen = 0, chatUnread = 0;
+function updateUnread() {
+  if (document.body.classList.contains('chat-open')) { chatSeen = S.chat.length; chatUnread = 0; }
+  else chatUnread = Math.min(99, S.chat.filter((c, k) => k >= chatSeen && !c.sys).length);
+}
+$('chatClose').onclick = () => { document.body.classList.remove('chat-open'); if (S) renderGame(); };
+function renderChat() {
+  const log = $('chatlog');
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
+  log.innerHTML = '';
+  S.chat.forEach((c) => {
+    const d = document.createElement('div');
+    if (c.sys) { d.className = 'sys'; d.textContent = '• ' + c.text; }
+    else d.textContent = `${c.from}：${c.text}`;
+    log.appendChild(d);
+  });
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+$('chatForm').onsubmit = (e) => {
+  e.preventDefault();
+  const v = $('chatInput').value.trim();
+  if (v) send({ type: 'chat', text: v });
+  $('chatInput').value = '';
+};
+
+let resultShownKey = '', resultTimer = null;
+function renderResult() {
+  const m = $('resultModal');
+  if (S.phase !== 'over' || !S.result) { m.classList.add('hidden'); return; }
+  // 先讓「胡！」「自摸！」的對話框秀一下，再跳出結算畫面
+  const key = `${S.handNo}-${S.result.nextAt}`;
+  if (key !== resultShownKey) {
+    m.classList.add('hidden');
+    if (!resultTimer) {
+      resultTimer = setTimeout(() => {
+        resultTimer = null;
+        resultShownKey = key;
+        if (S && S.phase === 'over') renderResult();
+      }, S.result.draw ? 600 : 1500);
+    }
+    return;
+  }
+  const r = S.result;
+  let h = '<div class="box">';
+  if (r.draw) h += '<h2>流局</h2><p>牌牆已摸完，莊家連莊。</p>';
+  else {
+    const w = S.seats[r.winner].name;
+    h += `<h2>${w} ${r.special || (r.selfDraw ? '自摸' : r.rob ? '搶槓' : '胡牌')}　${r.tai} 台${r.mult > 1 ? `　(底 + 台) ×${r.mult}` : ''}</h2>`;
+    if (r.special === '七搶一') h += `<p>付款：${S.seats[r.from].name}（持有第 8 張花）</p>`;
+    else if (!r.selfDraw) h += `<p>放槍：${S.seats[r.from].name}　胡 ${tileName(r.tile)}</p>`;
+    h += '<div class="items">' + r.items.map((i) => `<div><span>${i.name}</span><span>${i.text || i.tai + ' 台'}</span></div>`).join('') + '</div>';
+    if (r.dice) h += `<p class="hint">本局骰子：${r.dice.map((v) => DICE_FACE[v - 1]).join(' ')}${r.diceRule ? `（骰規：${r.diceRule}）` : '（無骰規）'}</p>`;
+    h += '<div class="row" style="margin:10px 0">';
+    const hand = S.seats[r.winner].hand || [];
+    const tmp = document.createElement('div');
+    hand.forEach((t) => tmp.appendChild(tileEl(t, 'sm')));
+    S.seats[r.winner].melds.forEach((mm) => tmp.appendChild(meldEl(mm)));
+    if (!r.selfDraw && r.tile != null) tmp.appendChild(tileEl(r.tile, 'sm latest'));
+    if (r.special) S.seats[r.winner].flowers.forEach((t) => tmp.appendChild(tileEl(t, 'sm')));
+    h += tmp.innerHTML + '</div>';
+  }
+  h += '<table>' + S.seats.map((s, i) => {
+    const d = r.delta ? r.delta[i] : 0;
+    return `<tr><td>${s.name}</td><td>${S.scores[i]}</td><td class="${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</td></tr>`;
+  }).join('') + '</table>';
+  if (r.jiangOver) h += `<p class="big" style="color:#f4c542">第 ${r.jiang} 將結束！下一將重新選座位、擲骰決定莊家</p>`;
+  h += `<button id="nextBtn">${r.jiangOver ? '下一將' : '下一局'}</button> <span class="timer" id="nextTimer"></span></div>`;
+  m.innerHTML = h;
+  m.classList.remove('hidden');
+  $('nextBtn').onclick = () => send({ type: 'next' });
+}
+
+function startTimer() {
+  clearInterval(tick);
+  const upd = () => {
+    const left = Math.max(0, Math.ceil((S.deadline - Date.now()) / 1000));
+    const t = $('timer');
+    if (t && (S.phase === 'discard' || S.phase === 'claim' || S.phase === 'seatPick' || S.phase === 'dice' || S.phase.startsWith('swap'))) t.textContent = `⏱ ${left}s`;
+    const nt = $('nextTimer');
+    if (nt && S.result && S.result.nextAt) nt.textContent = `${Math.max(0, Math.ceil((S.result.nextAt - Date.now()) / 1000))} 秒後自動開始`;
+  };
+  upd();
+  tick = setInterval(upd, 500);
+}
+
+function toast(text) {
+  const d = document.createElement('div');
+  d.className = 'toast';
+  d.textContent = text;
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 2500);
+}
+
+const DICE_FACE = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+let diceAnimKey = '';
+// 擲骰資訊：所有玩家都看得到骰子與結果
+function diceInfo() {
+  const d = S.dice;
+  const thrower = S.seats[d.thrower].name;
+  const title = d.stage === 'dealer' ? '擲骰決定起莊' : `莊家 ${thrower} 擲骰開門`;
+  if (!d.values) {
+    const wait = d.thrower === S.you ? '<div class="big">請擲骰子</div>' : `<div>等待 ${thrower} 擲骰子…</div>`;
+    return `<div>${title}</div>${wait}<div class="dice">${'<span class="die idle">⚀</span>'.repeat(3)}</div>`;
+  }
+  const key = `${S.handNo}-${d.stage}-${d.rolledAt}`;
+  const anim = key !== diceAnimKey && Date.now() - d.rolledAt < 1500;
+  diceAnimKey = key;
+  const dice = d.values.map((v) => `<span class="die${anim ? ' roll' : ''}">${DICE_FACE[v - 1]}</span>`).join('');
+  const target = S.seats[d.target].name;
+  const res = d.stage === 'dealer'
+    ? `由 <b>${target}</b> 起莊（東風）`
+    : `從 <b>${target}</b> 的牌牆第 ${d.total + 1} 墩開門`;
+  return `<div>${title}</div><div class="dice">${dice}</div><div class="big">${d.total} 點</div><div>${res}</div>`;
+}
+
+// 每將開始：海底擺東南西北，點選一張決定座位
+function renderSeatPick(box) {
+  const sp = S.seatPick;
+  const mySlot = sp.slots.find((x) => x.owner === S.you);
+  const mine = mySlot ? mySlot.wind : undefined;
+  box.innerHTML = `<div class="big">第 ${S.jiang} 將：選擇座位</div>` +
+    `<div>${sp.done ? '座位已決定，東家擲骰決定起莊…' : mine !== undefined ? `你翻到「${WINDS[mine]}」，等待其他玩家…` : '風牌蓋著，點選一張翻開決定你的座位'}</div>`;
+  const row = document.createElement('div');
+  row.className = 'seatpick';
+  sp.slots.forEach((slot, k) => {
+    const cell = document.createElement('div');
+    cell.className = 'seatcell';
+    const owner = slot.owner;
+    let t;
+    if (slot.wind !== null) t = tileEl(27 + slot.wind, 'taken');
+    else {
+      t = document.createElement('div');
+      t.className = 'tile facedown' + (mine === undefined && !sp.done ? ' pickable' : '');
+      if (mine === undefined && !sp.done) t.onclick = () => send({ type: 'seatpick', slot: k });
+    }
+    cell.appendChild(t);
+    const nm = document.createElement('div');
+    nm.className = 'seatname';
+    nm.textContent = owner !== null ? S.seats[owner].name + (owner === S.you ? '（你）' : '') : '　';
+    cell.appendChild(nm);
+    row.appendChild(cell);
+  });
+  box.appendChild(row);
+  const t = document.createElement('div');
+  t.className = 'timer';
+  t.id = 'timer';
+  box.appendChild(t);
+}
+
+// ---------- 玩家說話 ----------
+// 伺服器在打牌、吃、碰、槓、胡時送來 say 事件，在該玩家旁邊跳出對話框 (電腦也一樣)
+const SAY_TEXT = { pong: '碰！', chi: '吃！', kong: '槓！', hu: '胡！', zimo: '自摸！', rob: '搶槓！' };
+const sayEls = {};
+function showSay(m) {
+  if (!S || S.state !== 'playing') return;
+  const k = (m.seat - S.you + 4) % 4; // 0 自己、1 下家 (右)、2 對家、3 上家 (左)
+  const anchor = k === 0 ? $('me') : $('seat' + k);
+  if (!anchor || !anchor.offsetParent) return;
+  const win = ['hu', 'zimo', 'rob', 'special'].includes(m.kind);
+  const call = ['pong', 'chi', 'kong'].includes(m.kind);
+  const el = document.createElement('div');
+  el.className = 'say ' + (win ? 'say-win' : call ? 'say-call' : 'say-discard') + ' from' + k;
+  const name = document.createElement('span');
+  name.className = 'say-name';
+  name.textContent = S.seats[m.seat] ? S.seats[m.seat].name : '';
+  el.appendChild(name);
+  const line = document.createElement('div');
+  line.className = 'say-line';
+  if (m.kind === 'discard' || m.kind === 'migi') {
+    if (m.kind === 'migi') line.appendChild(Object.assign(document.createElement('b'), { className: 'say-migi', textContent: 'MIGI！' }));
+    line.appendChild(tileEl(m.tile, 'sm'));
+    line.append(tileName(m.tile));
+  } else {
+    line.append(m.kind === 'special' ? `${m.text}！` : SAY_TEXT[m.kind] || '');
+  }
+  el.appendChild(line);
+  speakSay(m);
+  // 同一位玩家的新對話框取代舊的
+  if (sayEls[m.seat]) sayEls[m.seat].remove();
+  sayEls[m.seat] = el;
+  $('sayLayer').appendChild(el);
+  placeSay(el, anchor, k);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); if (sayEls[m.seat] === el) delete sayEls[m.seat]; }, 250); }, win ? 2200 : call ? 1600 : 1300);
+}
+
+// 對話框位置：不能遮住海底 (各家牌河、換牌蓋牌)，也盡量不蓋到其他人的對話框
+// 在說話玩家的座位附近試很多位置，挑第一個完全不遮擋的；都會遮到就挑遮最少的
+function placeSay(el, anchor, k) {
+  const a = anchor.getBoundingClientRect();
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const rects = (sel) => [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect()).filter((r) => r.width && r.height);
+  const pool = rects('#center .pool .tile, #center .cover');
+  const others = [...document.querySelectorAll('#sayLayer .say')].filter((e) => e !== el && !e.classList.contains('out')).map((e) => e.getBoundingClientRect());
+  const area = (x, y, r) => Math.max(0, Math.min(x + w, r.right) - Math.max(x, r.left)) * Math.max(0, Math.min(y + h, r.bottom) - Math.max(y, r.top));
+  const cost = (x, y) => pool.reduce((s, r) => s + area(x, y, r) * 10, 0) + others.reduce((s, r) => s + area(x, y, r), 0);
+  const clampX = (x) => Math.max(6, Math.min(vw - w - 6, x));
+  const clampY = (y) => Math.max(6, Math.min(vh - h - 6, y));
+  const steps = (from, to, n = 8) => { const out = []; for (let i = 0; i <= n; i++) out.push(from + ((to - from) * i) / n); return out; };
+  const cands = []; // [x, y, 是否壓在座位上 (不需要小尾巴)]
+  if (k === 0) {
+    // 自己：先試手牌區上方那一行 (名字、副露列)，再試牌桌最下緣
+    for (const x of steps(a.left + 6, a.right - w - 6)) cands.push([x, a.top + 4, true]);
+    for (const x of steps(a.left + 6, a.right - w - 6)) cands.push([x, a.top - h - 10, false]);
+  } else if (k === 2) {
+    // 對家：先試座位框裡面，再試框下方
+    for (const y of steps(a.top + 4, Math.max(a.top + 4, a.bottom - h - 4), 3)) for (const x of steps(a.left + 4, a.right - w - 4)) cands.push([x, y, true]);
+    for (const x of steps(a.left + 4, a.right - w - 4)) cands.push([x, a.bottom + 10, false]);
+  } else {
+    // 左右兩家：沿著座位那一欄由上往下找
+    const inX = k === 1 ? a.right - w - 4 : a.left + 4;
+    const outX = k === 1 ? a.left - w - 10 : a.right + 10;
+    for (const y of steps(a.top + 4, a.bottom - h - 4, 12)) cands.push([inX, y, true]);
+    for (const y of steps(a.top + 4, a.bottom - h - 4, 12)) cands.push([outX, y, false]);
+  }
+  let best = null;
+  for (const [cx, cy, inside] of cands) {
+    const x = clampX(cx), y = clampY(cy);
+    const c = cost(x, y);
+    if (!best || c < best.c) best = { x, y, c, inside };
+    if (c === 0) break;
+  }
+  el.style.left = best.x + 'px';
+  el.style.top = best.y + 'px';
+  el.classList.toggle('inside', best.inside); // 壓在自己座位上時不需要指向座位的小尾巴
+}
+
+// ---------- 語音朗讀 (瀏覽器內建 Web Speech API) ----------
+// 預設關閉。按牌桌上方的「語音」打開設定面板：開關、調語速、試聽。設定存在這台裝置
+const VOICE_OK = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+let voiceOn = VOICE_OK && localStorage.getItem('mj_voice') === 'on';
+let voiceRate = Number(localStorage.getItem('mj_voice_rate')) || 1.1;
+let zhVoice = null;
+
+// 只用「Google 國語（臺灣）」：這個聲音內建在電腦版 Google Chrome，需要連網。
+// 其他瀏覽器 (Safari、Edge、Firefox、手機) 沒有這個聲音，語音功能就不提供
+const GOOGLE_TW = '國語（臺灣）';
+function pickVoice() {
+  if (!VOICE_OK) return;
+  zhVoice = speechSynthesis.getVoices().find((v) => /Google/i.test(v.name) && /zh[-_]TW/i.test(v.lang)) || null;
+  if (!$('voicePanel').classList.contains('hidden')) fillVoicePanel();
+  if (S && S.state === 'playing') renderGame();
+}
+if (VOICE_OK) { pickVoice(); speechSynthesis.addEventListener('voiceschanged', pickVoice); }
+
+function speak(text, seat = 0, force = false) {
+  if ((!voiceOn && !force) || !text || !zhVoice) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = zhVoice.lang;
+  u.voice = zhVoice;
+  u.rate = voiceRate;
+  u.pitch = [1, 1.12, 0.9, 1.05][seat % 4]; // 四個座位音調稍微不同，聽得出是誰
+  speechSynthesis.speak(u);
+}
+
+// 打牌很快：新的一句直接蓋掉還沒念完的，避免越念越慢
+function speakSay(m) {
+  if (!voiceOn) return;
+  const text = m.kind === 'discard' ? tileName(m.tile)
+    : m.kind === 'migi' ? `MIGI，${tileName(m.tile)}`
+      : m.kind === 'special' ? m.text
+        : ({ pong: '碰', chi: '吃', kong: '槓', hu: '胡', zimo: '自摸', rob: '搶槓' })[m.kind];
+  speechSynthesis.cancel();
+  speak(text, m.seat);
+}
+
+function setVoice(on) {
+  voiceOn = on;
+  localStorage.setItem('mj_voice', on ? 'on' : 'off');
+  if (on) speak('語音已開啟'); // 手機瀏覽器要在點擊時先念一次，之後才能自動念
+  else if (VOICE_OK) speechSynthesis.cancel();
+}
+
+// ----- 語音設定面板 -----
+function fillVoicePanel() {
+  const has = !!zhVoice;
+  $('vpOn').checked = voiceOn && has;
+  $('vpOn').disabled = !has;
+  $('vpTest').disabled = !has;
+  $('vpRate').value = voiceRate;
+  $('vpRateVal').textContent = `${voiceRate.toFixed(2)}×`;
+  $('vpVoiceName').textContent = has ? `Google ${GOOGLE_TW}` : '這個瀏覽器沒有';
+  $('vpTip').innerHTML = has ? '' :
+    `語音只使用「Google ${GOOGLE_TW}」，這個聲音內建在<b>電腦版 Google Chrome</b>（需要連網）。<br>` +
+    'Safari、Edge、Firefox 和手機瀏覽器沒有這個聲音，所以不提供語音。';
+}
+function toggleVoicePanel(force) {
+  const p = $('voicePanel');
+  const open = force !== undefined ? force : p.classList.contains('hidden');
+  p.classList.toggle('hidden', !open);
+  if (open) fillVoicePanel();
+}
+if (VOICE_OK) {
+  $('vpClose').onclick = () => toggleVoicePanel(false);
+  $('vpOn').onchange = (e) => { setVoice(e.target.checked && !!zhVoice); fillVoicePanel(); if (S) renderGame(); };
+  $('vpRate').oninput = (e) => {
+    voiceRate = Number(e.target.value);
+    localStorage.setItem('mj_voice_rate', String(voiceRate));
+    $('vpRateVal').textContent = `${voiceRate.toFixed(2)}×`;
+  };
+  $('vpTest').onclick = () => { speechSynthesis.cancel(); speak('三萬，碰！自摸，三台！', 0, true); };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleVoicePanel(false); });
+}

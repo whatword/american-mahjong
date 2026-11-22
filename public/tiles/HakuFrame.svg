@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+  <!-- 白板：台灣常見的藍色雙線方框 (本專案自製，疊在 Front.svg 上) -->
+  <rect x="62" y="74" width="176" height="252" rx="12" fill="none" stroke="#1f4fa0" stroke-width="14"/>
+  <rect x="88" y="100" width="124" height="200" rx="6" fill="none" stroke="#1f4fa0" stroke-width="6"/>
+</svg>
