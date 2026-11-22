@@ -477,3 +477,7 @@ button.danger { background: #e74c3c; color: #fff; }
 /* 對話框壓在說話玩家的座位上時，不顯示指向座位的小尾巴 */
 .say.inside::after { display: none; }
 .habitbar { margin: 8px 0 18px; justify-content: flex-start; }
+
+/* 連莊徽章 */
+.streak { display: inline-block; padding: 2px 10px; border-radius: 999px; background: linear-gradient(135deg, #ff8a00, #e52e2e); color: #fff; font-weight: 700; font-size: 1.1em; box-shadow: 0 0 8px rgba(255, 140, 0, .8); animation: streak-glow 1.4s ease-in-out infinite alternate; }
+@keyframes streak-glow { from { box-shadow: 0 0 4px rgba(255, 140, 0, .5); } to { box-shadow: 0 0 14px rgba(255, 90, 0, 1); } }

@@ -422,7 +422,7 @@ function renderGame() {
   const rel = (k) => (me + k) % 4; // k: 0 自己, 1 下家(右), 2 對家, 3 上家(左)
 
   $('topbar').innerHTML = `<button id="backHallBtn" class="ghost small">回大廳</button><span>${S.title}</span><span>第 ${S.jiang} 將 ・ ${WINDS[S.round]}風圈 ・ 第 ${S.handNo} 局</span>` +
-    `<span>莊家：${S.seats[S.dealer].name}${S.streak ? ` 連${S.streak}拉${S.streak}` : ''}</span>` +
+    `<span>莊家：${S.seats[S.dealer].name}</span>` +
     (S.breakInfo ? `<span class="opt2">開門：${S.seats[S.breakInfo.owner].name} 牌牆第 ${S.breakInfo.stack} 墩</span>` : '') +
     `<span>剩餘牌數：${S.wall}</span><span class="opt">底${S.base} / 每台${S.taiValue}</span>` +
     (VOICE_OK ? (() => { const on = voiceOn && !!zhVoice; return `<button id="voiceToggle" class="ghost small${on ? ' on' : ''}" title="打牌、吃、碰、胡時念出來" aria-label="${on ? '語音開' : '語音關'}">${on ? '🔊<span class="lbl"> 語音開</span>' : '🔇<span class="lbl"> 語音關</span>'}</button>`; })() : '') +
@@ -461,6 +461,7 @@ function renderGame() {
       nm.className = 'nm';
       nm.innerHTML = '';
       nm.append(`${wind} ${s.name}${s.online ? '' : '(離線)'}${i === S.dealer ? ' 莊' : ''}`);
+      if (i === S.dealer && S.streak) nm.append(' ', Object.assign(document.createElement('b'), { className: 'streak', textContent: `🔥 連${S.streak}拉${S.streak}` }));
       if (s.migi) nm.appendChild(Object.assign(document.createElement('span'), { className: 'migi-badge', textContent: 'MIGI' }));
       el.appendChild(nm);
       const sc = document.createElement('div');
@@ -525,7 +526,7 @@ function renderGame() {
   const wind = WINDS[(me - S.dealer + 4) % 4];
   const myTurn = S.phase === 'discard' && S.turn === me;
   const mm = document.createElement('div');
-  mm.innerHTML = `<span style="margin-right:10px">${wind} ${S.seats[me].name}${me === S.dealer ? ' 莊' : ''} 💰${S.scores[me]}</span>` +
+  mm.innerHTML = `<span style="margin-right:10px">${wind} ${S.seats[me].name}${me === S.dealer ? ' 莊' : ''}${me === S.dealer && S.streak ? ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` : ''} 💰${S.scores[me]}</span>` +
     (S.seats[me].migi ? '<span class="migi-badge">MIGI</span>' : '');
   S.seats[me].melds.forEach((m) => mm.appendChild(meldEl(m)));
   if (S.myTaken && S.myTaken.length) {
@@ -784,7 +785,7 @@ function renderResult() {
   }
   const r = S.result;
   let h = '<div class="box">';
-  if (r.draw) h += '<h2>流局</h2><p>牌牆已摸完，莊家連莊。</p>';
+  if (r.draw) h += '<h2>流局</h2><p>牌牆已摸完，莊家連莊。' + ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` + '</p>';
   else {
     const w = S.seats[r.winner].name;
     h += `<h2>${w} ${r.special || (r.selfDraw ? '自摸' : r.rob ? '搶槓' : '胡牌')}　${r.tai} 台${r.mult > 1 ? `　(底 + 台) ×${r.mult}` : ''}</h2>`;
