@@ -117,6 +117,7 @@ function connect(name, email) {
     else if (m.type === 'state') { S = m; render(); }
     else if (m.type === 'toast') toast(m.text);
     else if (m.type === 'say') showSay(m);
+    else if (m.type === 'habitFile') downloadFile(m);
     else if (m.type === 'kicked') kicked = true;
   };
   ws.onclose = () => {
@@ -138,6 +139,7 @@ function renderHall() {
   list.innerHTML = '';
   $('hallCount').textContent = `房間 ${hall.rooms.length} / ${hall.max}`;
   renderBoard(hall.board || []);
+  renderMe(hall.board || [], hall.achievements || []);
   $('createBtn').disabled = hall.rooms.length >= hall.max;
   if (!hall.rooms.length) {
     list.innerHTML = '<p class="hint">目前沒有房間，按「開新房間」建立一桌。</p>';
@@ -202,12 +204,10 @@ function renderBoard(list) {
   });
 }
 
-function showStats(p, rank) {
-  const m = $('statModal');
+// 戰績明細 (計分板的彈窗和個人化頁面共用)
+function statGridHtml(p) {
   const vs = (o) => `${pctText(o.rate)} <small>（${o.w} 勝 ${o.l} 負）</small>`;
-  m.innerHTML = `<div class="box">
-    <h2>第 ${rank} 名　${who(p)}</h2>
-    <div class="statgrid">
+  return `<div class="statgrid">
       <div class="wide"><span>總金額 = 跟玩家輸贏 + 跟電腦輸贏</span>
         <b class="${p.money >= 0 ? 'pos' : 'neg'}">${money(p.money)}</b>
         <small>= 跟玩家 <i class="${sign(p.moneyVsHuman)}">${money(p.moneyVsHuman)}</i> ＋ 跟電腦 <i class="${sign(p.moneyVsBot)}">${money(p.moneyVsBot)}</i>${p.moneyLegacy ? ` ＋ 舊紀錄（未分類） <i class="${sign(p.moneyLegacy)}">${money(p.moneyLegacy)}</i>` : ''}</small></div>
@@ -216,13 +216,62 @@ function showStats(p, rank) {
       <div><span>跟電腦勝率</span><b>${vs(p.vsBot)}</b></div>
       <div><span>自摸次數</span><b>${p.selfDraws}</b></div>
       <div><span>放槍次數</span><b>${p.dealIns}</b></div>
-    </div>
+    </div>`;
+}
+
+function showStats(p, rank) {
+  const m = $('statModal');
+  m.innerHTML = `<div class="box">
+    <h2>第 ${rank} 名　${who(p)}</h2>
+    ${statGridHtml(p)}
     <p class="hint">總勝率 = 胡牌局數 ÷ 參與局數。跟玩家／電腦勝率 = 和真人／電腦之間有輸贏的次數中，自己贏的比例（胡牌時贏每位付錢的人，付錢時輸給胡牌的人）。</p>
     <button id="statClose">關閉</button>
   </div>`;
   m.classList.remove('hidden');
   $('statClose').onclick = () => m.classList.add('hidden');
   m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+}
+
+// ---------- 個人化頁面 ----------
+let hallTab = 'board';
+function setHallTab(t) {
+  hallTab = t;
+  $('boardPane').classList.toggle('hidden', t !== 'board');
+  $('mePane').classList.toggle('hidden', t !== 'me');
+  $('tabBoard').classList.toggle('active', t === 'board');
+  $('tabMe').classList.toggle('active', t === 'me');
+}
+$('tabBoard').onclick = () => setHallTab('board');
+$('tabMe').onclick = () => setHallTab('me');
+
+// 打牌習慣：向伺服器要檔案，收到後用 Blob 觸發瀏覽器下載
+$('habitMd').onclick = () => send({ type: 'habitExport', fmt: 'md' });
+$('habitJson').onclick = () => send({ type: 'habitExport', fmt: 'json' });
+function downloadFile({ filename, content, fmt }) {
+  const type = fmt === 'json' ? 'application/json' : 'text/markdown';
+  const url = URL.createObjectURL(new Blob([content], { type: `${type};charset=utf-8` }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function renderMe(list, achievements) {
+  const empty = {
+    money: 0, moneyVsHuman: 0, moneyVsBot: 0, moneyLegacy: 0, hands: 0, wins: 0, selfDraws: 0, dealIns: 0, winRate: null,
+    vsHuman: { w: 0, l: 0, rate: null }, vsBot: { w: 0, l: 0, rate: null }, ach: {},
+  };
+  const p = list.find((x) => x.you) || empty;
+  $('meStats').innerHTML = statGridHtml(p);
+  const done = achievements.filter((a) => p.ach[a.name] > 0);
+  const todo = achievements.filter((a) => !(p.ach[a.name] > 0));
+  const item = (a, n) => `<div class="ach ${n ? 'done' : 'todo'}"><span class="atai">${a.tai} 台</span><span class="aname">${n ? '✅' : '🔒'} ${escapeHtml(a.name)}</span>${n ? `<span class="acnt">×${n}</span>` : ''}</div>`;
+  $('achList').innerHTML =
+    `<h4>已完成 ${done.length} / ${achievements.length}</h4><div class="achgrid">${done.map((a) => item(a, p.ach[a.name])).join('') || '<p class="hint">還沒有完成的成就。</p>'}</div>` +
+    `<h4>未完成 ${todo.length}</h4><div class="achgrid">${todo.map((a) => item(a, 0)).join('') || '<p class="hint">全部完成了！🎉</p>'}</div>`;
 }
 $('leaveBtn').onclick = async () => {
   const yes = await confirmDialog({
@@ -859,46 +908,37 @@ function showSay(m) {
   setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); if (sayEls[m.seat] === el) delete sayEls[m.seat]; }, 250); }, win ? 2200 : call ? 1600 : 1300);
 }
 
-// 對話框位置：不能遮住海底 (各家牌河、換牌蓋牌)，也盡量不蓋到其他人的對話框
-// 在說話玩家的座位附近試很多位置，挑第一個完全不遮擋的；都會遮到就挑遮最少的
+// 對話框位置：不能遮住海底的牌 (各家牌河、換牌蓋牌)，也盡量不蓋到其他人的對話框
+// 電腦版：放在牌桌中央的空位 (海底裡沒有牌的地方)，由靠近說話玩家的位置先挑
+// 手機版：放在使用者自己的手牌區
 function placeSay(el, anchor, k) {
-  const a = anchor.getBoundingClientRect();
   const w = el.offsetWidth, h = el.offsetHeight;
-  const vw = window.innerWidth, vh = window.innerHeight;
   const rects = (sel) => [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect()).filter((r) => r.width && r.height);
-  const pool = rects('#center .pool .tile, #center .cover');
   const others = [...document.querySelectorAll('#sayLayer .say')].filter((e) => e !== el && !e.classList.contains('out')).map((e) => e.getBoundingClientRect());
   const area = (x, y, r) => Math.max(0, Math.min(x + w, r.right) - Math.max(x, r.left)) * Math.max(0, Math.min(y + h, r.bottom) - Math.max(y, r.top));
-  const cost = (x, y) => pool.reduce((s, r) => s + area(x, y, r) * 10, 0) + others.reduce((s, r) => s + area(x, y, r), 0);
-  const clampX = (x) => Math.max(6, Math.min(vw - w - 6, x));
-  const clampY = (y) => Math.max(6, Math.min(vh - h - 6, y));
-  const steps = (from, to, n = 8) => { const out = []; for (let i = 0; i <= n; i++) out.push(from + ((to - from) * i) / n); return out; };
-  const cands = []; // [x, y, 是否壓在座位上 (不需要小尾巴)]
-  if (k === 0) {
-    // 自己：先試手牌區上方那一行 (名字、副露列)，再試牌桌最下緣
-    for (const x of steps(a.left + 6, a.right - w - 6)) cands.push([x, a.top + 4, true]);
-    for (const x of steps(a.left + 6, a.right - w - 6)) cands.push([x, a.top - h - 10, false]);
-  } else if (k === 2) {
-    // 對家：先試座位框裡面，再試框下方
-    for (const y of steps(a.top + 4, Math.max(a.top + 4, a.bottom - h - 4), 3)) for (const x of steps(a.left + 4, a.right - w - 4)) cands.push([x, y, true]);
-    for (const x of steps(a.left + 4, a.right - w - 4)) cands.push([x, a.bottom + 10, false]);
-  } else {
-    // 左右兩家：沿著座位那一欄由上往下找
-    const inX = k === 1 ? a.right - w - 4 : a.left + 4;
-    const outX = k === 1 ? a.left - w - 10 : a.right + 10;
-    for (const y of steps(a.top + 4, a.bottom - h - 4, 12)) cands.push([inX, y, true]);
-    for (const y of steps(a.top + 4, a.bottom - h - 4, 12)) cands.push([outX, y, false]);
-  }
+  const sum = (x, y, list) => list.reduce((t, r) => t + area(x, y, r), 0);
+  const mobile = window.matchMedia('(max-width: 1000px)').matches;
+  const box = ($(mobile ? 'me' : 'center') || anchor).getBoundingClientRect();
+  const pool = rects('#center .pool .tile, #center .cover');
+  const hand = rects('#myHand .tile');
+  const a = anchor.getBoundingClientRect();
+  const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  const x0 = box.left + 4, x1 = Math.max(x0, box.right - w - 4);
+  const y0 = box.top + 4, y1 = Math.max(y0, box.bottom - h - 4);
   let best = null;
-  for (const [cx, cy, inside] of cands) {
-    const x = clampX(cx), y = clampY(cy);
-    const c = cost(x, y);
-    if (!best || c < best.c) best = { x, y, c, inside };
-    if (c === 0) break;
+  const N = 14;
+  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+    const x = x0 + ((x1 - x0) * i) / N, y = y0 + ((y1 - y0) * j) / N;
+    // 先比遮住的牌 (海底最重要，其次是別人的對話框)，再比離說話玩家的距離
+    const c = mobile
+      ? sum(x, y, others) * 4 + sum(x, y, hand) * 0.01 + y * 0.001
+      : sum(x, y, pool) * 10 + sum(x, y, others) * 4;
+    const d = mobile ? 0 : Math.hypot(x + w / 2 - ax, y + h / 2 - ay);
+    if (!best || c < best.c - 1 || (Math.abs(c - best.c) <= 1 && d < best.d)) best = { x, y, c, d };
   }
   el.style.left = best.x + 'px';
   el.style.top = best.y + 'px';
-  el.classList.toggle('inside', best.inside); // 壓在自己座位上時不需要指向座位的小尾巴
+  el.classList.add('inside'); // 對話框在牌桌中央或手牌區，不需要指向座位的小尾巴
 }
 
 // ---------- 語音朗讀 (瀏覽器內建 Web Speech API) ----------

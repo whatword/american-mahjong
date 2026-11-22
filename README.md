@@ -12,6 +12,7 @@
 - 玩家離線時由電腦代打，可從大廳回到原牌局
 - 房內文字聊天
 - 計分板：以 email 區分玩家，累計戰績並存到 `data/stats.json`
+- 打牌習慣：記錄真人玩家每次打牌（附向聽數、進張、危險度與電腦建議）、吃碰槓、過水與每局結果，存到 `data/habits/`。大廳「👤 個人化」可下載「AI 分析檔 (.md)」（內含分析指示，整份貼給 ChatGPT、Claude 等 AI 即可得到做得好、待改善與練習建議）或原始資料 (.json)。電腦與離線代打的操作不記錄
 
 ## 環境需求
 
@@ -33,6 +34,7 @@ npm start
 | --- | --- | --- |
 | `PORT` | `3000` | 伺服器監聽埠 |
 | `STATS_FILE` | `data/stats.json` | 計分板檔案位置 |
+| `HABITS_DIR` | `data/habits` | 打牌習慣紀錄資料夾（未設定但有設 `STATS_FILE` 時為 `<STATS_FILE>.habits`） |
 | `BOT_DELAY` | `700` | 電腦每個動作的延遲（毫秒） |
 | `SEAT_SHOW_MS` | `3000` | 座位結果顯示時間（毫秒） |
 | `DICE_SHOW_MS` | `2500` | 骰子結果顯示時間（毫秒） |
@@ -108,7 +110,7 @@ cloudflared tunnel run mahjong
 - 電腦睡眠、關機，或 `cloudflared` 與 `npm start` 任一個停止時，朋友就無法連線。兩個程式都要保持執行。
 - 如果修改了 `PORT`，Tunnel 的目標網址也要一起改，例如 `http://localhost:8080`。
 - 遊戲本身沒有密碼，知道網址的人都能進入大廳。要限制進入者，可以在 Cloudflare Zero Trust 為這個網址加上 Access 規則。
-- 計分板以玩家輸入的 email 為帳號，**沒有驗證**。`data/` 已列入 `.gitignore`，不要把它提交到 Git。
+- 計分板以玩家輸入的 email 為帳號，**沒有驗證**。`data/` 已列入 `.gitignore`，不要把它提交到 Git。打牌習慣紀錄同樣以 email 為帳號，知道 email 的人就能下載該帳號的紀錄。
 
 ## 測試
 
@@ -125,6 +127,7 @@ server.js     HTTP 靜態檔案伺服器與 WebSocket 房間、牌局流程
 game.js       牌、胡牌判斷、台數計算
 ai.js         電腦玩家
 stats.js      計分板讀寫
+habits.js     打牌習慣紀錄、統計與下載檔產生
 public/       前端（index.html、client.js、style.css、tiles/ 牌面圖）
 test/         規則與 AI 測試，test/ui 為畫面測試
 data/         執行時產生的戰績（不納入版本控制）

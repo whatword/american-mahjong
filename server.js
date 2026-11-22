@@ -6,6 +6,7 @@ const { WebSocketServer } = require('ws');
 const G = require('./game');
 const AI = require('./ai');
 const Stats = require('./stats');
+const Habits = require('./habits');
 
 const PORT = process.env.PORT || 3000;
 const BASE = 50; // 底錢
@@ -58,6 +59,8 @@ function send(ws, o) {
 }
 
 const sortTiles = (a) => a.slice().sort((x, y) => x - y);
+const tileName = (t) => (t == null ? null : G.TILE_NAMES[t]);
+const tileNames = (a) => sortTiles(a).map(tileName);
 
 class Room {
   constructor(id) {
@@ -75,6 +78,13 @@ class Room {
     this.chat = [];
     this.result = null;
     this.handNo = 0;
+  }
+
+  // 打牌習慣紀錄：只記錄真人親自操作 (電腦、離線由電腦代打都不記)。ev 用函式延後計算，出錯也不能影響牌局
+  habit(i, ev) {
+    const s = this.seats[i];
+    if (!s || s.bot || !s.ws || !s.token) return;
+    try { Habits.log(s.token, { ts: Date.now(), h: this.handUid, ...ev(s) }); } catch (e) { console.error('打牌紀錄失敗', e.message); }
   }
 
   // ----- 座位管理 -----
@@ -234,12 +244,13 @@ class Room {
   startHand(firstHand = false) {
     clearTimeout(this.timer);
     this.handNo++;
+    this.handUid = `${Date.now().toString(36)}-${this.id}-${this.handNo}`;
     this.wall = [];
     this.result = null;
     this.last = null;
     this.claims = null;
     this.kongDraw = false;
-    for (const s of this.seats) { s.hand = []; s.melds = []; s.flowers = []; s.discards = []; s.drawn = null; s.cover = null; s.taken = []; s.confirmed = false; s.noPong = new Set(); s.migi = false; s.swapIn = null; s.forbid = null; s.justDiscarded = null; s.noRon = false; }
+    for (const s of this.seats) { s.hand = []; s.melds = []; s.flowers = []; s.discards = []; s.drawn = null; s.cover = null; s.taken = []; s.confirmed = false; s.noPong = new Set(); s.migi = false; s.swapIn = null; s.forbid = null; s.justDiscarded = null; s.noRon = false; s.dn = 0; }
     this.breakInfo = null;
     this.handDice = null;
     if (firstHand) {
@@ -297,6 +308,9 @@ class Room {
     for (let k = 0; k < 4; k++) {
       const s = this.seats[(this.dealer + k) % 4];
       this.fixFlowers(s);
+    }
+    for (let i = 0; i < 4; i++) {
+      this.habit(i, (s) => ({ k: 'start', no: this.handNo, dealer: i === this.dealer, seatWind: '東南西北'[(i - this.dealer + 4) % 4], roundWind: '東南西北'[this.round], hand: tileNames(s.hand), flowers: s.flowers.length }));
     }
     if (this.flowerWin()) return;
     // 莊家先抽門牌 (第 17 張)，再決定是否換牌
@@ -612,8 +626,16 @@ class Room {
     for (const s of this.seats) if (s && s.ws) send(s.ws, { type: 'say', seat: i, kind, tile, text });
   }
 
-  doDiscard(i, tile, migi = false) {
+  doDiscard(i, tile, migi = false, how = null) {
     const s = this.seats[i];
+    this.habit(i, () => {
+      const r = AI.reviewDiscard(this, i, tile, [...new Set(this.allowedDiscards(i))]);
+      return {
+        k: 'discard', n: ++s.dn, hand: tileNames(s.hand), drawn: tileName(s.drawn), tile: tileName(tile), migi, timeout: how === 'timeout',
+        wall: Math.max(0, this.wall.length - DEAD_WALL), melds: s.melds.length,
+        chosen: r.chosen, best: { ...r.best, tile: tileName(r.best.tile) }, threat: r.threat, defending: r.defending,
+      };
+    });
     this.say(i, migi ? 'migi' : 'discard', tile);
     s.hand.splice(s.hand.indexOf(tile), 1);
     s.noPong.clear();
@@ -661,20 +683,22 @@ class Room {
     if (s.migi && this.evalWin(i, null, true)) return this.handle(i, { type: 'hu' });
     const allowed = this.allowedDiscards(i);
     const t = s.drawn != null && allowed.includes(s.drawn) ? s.drawn : allowed[allowed.length - 1];
-    this.doDiscard(i, t);
+    this.doDiscard(i, t, false, 'timeout');
   }
 
   doAngang(i, tile) {
     const s = this.seats[i];
     this.say(i, 'kong');
+    this.habit(i, () => ({ k: 'kong', type: 'angang', tile: tileName(tile) }));
     s.hand = s.hand.filter((t) => t !== tile);
     s.melds.push({ type: 'angang', tiles: [tile, tile, tile, tile] });
-    this.afterKong(i);
+    this.afterKong(i, false);
   }
 
   // 加槓 (明槓) 可被搶槓；暗槓不可搶
   doJiagang(i, meld) {
     const tile = meld.tiles[0];
+    this.habit(i, () => ({ k: 'kong', type: 'jiagang', tile: tileName(tile) }));
     const claims = {};
     for (let k = 1; k <= 3; k++) {
       const p = (i + k) % 4;
@@ -699,16 +723,21 @@ class Room {
     s.hand.splice(s.hand.indexOf(meld.tiles[0]), 1);
     meld.type = 'kong';
     meld.tiles = [meld.tiles[0], meld.tiles[0], meld.tiles[0], meld.tiles[0]];
-    this.afterKong(i);
+    this.afterKong(i, true);
   }
 
-  afterKong(i) {
+  // exposed: 明槓 (大明槓/加槓)。明槓後補牌不能自摸，補到胡牌進入過水
+  afterKong(i, exposed) {
     const s = this.seats[i];
     s.drawn = null;
     if (this.wall.length <= DEAD_WALL) return this.endHand(null);
     this.drawFor(i, true);
     if (this.flowerWin()) return;
     this.kongDraw = true;
+    if (exposed && s.drawn != null && !s.noRon && this.evalWin(i, null, true)) {
+      s.noRon = true;
+      this.sys(`${s.name} 明槓後摸到胡牌，不能自摸，進入過水`);
+    }
     this.enterDiscard(i);
   }
 
@@ -786,9 +815,19 @@ class Room {
     this.seq++;
     const { tile, from } = this.last;
     const order = [1, 2, 3].map((k) => (from + k) % 4).filter((p) => this.claims[p]);
+    const timedOut = Date.now() >= this.deadline - 100;
     for (const p of order) {
       const c = this.claims[p];
       const t = c.resp && c.resp.type;
+      this.habit(p, () => {
+        const o = c.opts;
+        return {
+          k: 'claim', tile: tileName(tile), from: ['', '上家', '對家', '下家'][(p - from + 4) % 4],
+          options: [o.hu && 'hu', o.pong && 'pong', o.kong && 'kong', o.chi && o.chi.length && 'chi'].filter(Boolean),
+          action: t || (o.forced ? 'hu' : timedOut ? 'timeout' : 'none'), tiles: c.resp && c.resp.tiles ? c.resp.tiles.map(tileName) : undefined,
+          ref: o.hu ? 'hu' : AI.decideClaim(this, p, o, tile).type, sh: AI.currentState(this, p).sh,
+        };
+      });
       // 過碰：可以碰卻沒碰，到輪到自己之前不能再碰同一張
       if ((c.opts.pong || c.opts.kong) && t !== 'pong' && t !== 'kong' && t !== 'hu') this.seats[p].noPong.add(tile);
       // 過水：可以胡卻沒胡 (按過、時間到、改選吃碰)，到自己打出一張牌前都不能胡別人的牌
@@ -845,7 +884,7 @@ class Room {
     this.last = null;
     s.justDiscarded = null;
     s.forbid = type === 'kong' ? null : this.forbiddenAfterCall(tile, type, tiles || []);
-    if (type === 'kong') return this.afterKong(p);
+    if (type === 'kong') return this.afterKong(p, true);
     this.kongDraw = false;
     this.enterDiscard(p);
   }
@@ -894,6 +933,18 @@ class Room {
       };
       dealerStays = winner === this.dealer;
       for (let p = 0; p < 4; p++) this.scores[p] += delta[p];
+    }
+    for (let p = 0; p < 4; p++) {
+      this.habit(p, (s) => {
+        const r = this.result;
+        const outcome = r.draw ? 'draw' : r.winner === p ? (r.selfDraw ? 'zimo' : 'win') : r.selfDraw ? 'zimoLoss' : r.from === p ? 'dealin' : 'otherWin';
+        return {
+          k: 'end', no: this.handNo, outcome, dealer: p === this.dealer, delta: r.delta ? r.delta[p] : 0, tai: r.draw ? 0 : r.tai,
+          items: r.draw ? [] : r.items.map((x) => x.name), hand: tileNames(s.hand), flowers: s.flowers.length,
+          melds: s.melds.map((m) => ({ type: m.type, tiles: m.tiles.map((t) => (t == null ? null : tileName(t))) })),
+          ting: s.hand.length % 3 === 1 ? G.waits(s.hand, s.melds.length).length > 0 : null,
+        };
+      });
     }
     Stats.recordHand(this.seats, this.result); // 計分板：累計金額、勝率、自摸、放槍
     hallChanged(); // 大廳的計分板即時更新
@@ -1118,7 +1169,7 @@ function hallList(email) {
 }
 
 function sendHall(ws) {
-  send(ws, { type: 'hall', rooms: hallList(ws.user.email), max: MAX_ROOMS, me: ws.user, board: Stats.board(ws.user.email) });
+  send(ws, { type: 'hall', rooms: hallList(ws.user.email), max: MAX_ROOMS, me: ws.user, board: Stats.board(ws.user.email), achievements: Stats.ACHIEVEMENTS });
 }
 
 // 房間有變動時，更新所有在大廳的玩家畫面 (同一輪事件只送一次)
@@ -1175,6 +1226,14 @@ wss.on('connection', (ws) => {
       return sendHall(ws);
     }
     if (!ws.user) return;
+
+    // 個人化頁面：下載打牌習慣 (md = 附 AI 分析指示的檔案，json = 原始資料)；只能下載自己登入帳號的紀錄
+    if (msg.type === 'habitExport') {
+      const fmt = msg.fmt === 'json' ? 'json' : 'md';
+      const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const content = fmt === 'json' ? Habits.exportJson(ws.user.email, ws.user.name) : Habits.exportMarkdown(ws.user.email, ws.user.name);
+      return send(ws, { type: 'habitFile', fmt, filename: `mahjong-habits-${date}.${fmt}`, content });
+    }
 
     // 大廳
     if (!ws.ctx) {

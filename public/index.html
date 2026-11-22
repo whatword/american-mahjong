@@ -32,10 +32,27 @@
   </div>
   <div id="roomList"></div>
   <div class="boardsec">
-    <h2>🏆 計分板</h2>
-    <p class="hint">依累計金額排名（所有房間、所有局數的輸贏總和）。點選玩家或電腦查看戰績。</p>
-    <div id="podium"></div>
-    <div id="rankList"></div>
+    <div class="tabs" role="tablist">
+      <button id="tabBoard" type="button" class="tab active" role="tab">🏆 計分板</button>
+      <button id="tabMe" type="button" class="tab" role="tab">👤 個人化</button>
+    </div>
+    <div id="boardPane">
+      <p class="hint">依累計金額排名（所有房間、所有局數的輸贏總和）。點選玩家或電腦查看戰績。</p>
+      <div id="podium"></div>
+      <div id="rankList"></div>
+    </div>
+    <div id="mePane" class="hidden">
+      <div id="meStats"></div>
+      <h3>📈 打牌習慣</h3>
+      <p class="hint">系統會記錄你親自操作的每一次打牌、吃碰槓與過水（電腦代打不算）。下載「AI 分析檔」後，整份貼給 ChatGPT、Claude 等 AI，就會得到打牌建議、做得好與要改善的地方。</p>
+      <div class="row habitbar">
+        <button id="habitMd" type="button">⬇ 下載 AI 分析檔 (.md)</button>
+        <button id="habitJson" type="button" class="ghost">下載原始資料 (.json)</button>
+      </div>
+      <h3>🏅 成就</h3>
+      <p class="hint">用各種牌型胡牌就能解鎖，依台數多寡排列。</p>
+      <div id="achList"></div>
+    </div>
   </div>
 </div>
 

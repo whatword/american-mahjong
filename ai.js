@@ -322,4 +322,21 @@ function decideSwap(room, seat) {
   return currentState(room, seat).sh >= SWAP_MIN_SHANTEN;
 }
 
-module.exports = { decideSwap, threatOf, dangerFor, passedBy, shanten, handShanten, unseenCounts, chooseDiscard, chooseWorst, decideClaim, decideKong, currentState };
+// 打牌習慣紀錄用：評估玩家實際打出的牌，並和電腦會選的牌比較 (只讀取牌局，不改變任何狀態)
+// 必須在牌還在手上 (尚未打出) 時呼叫。sh: 打出後的向聽數 (0 = 聽牌)，uk: 進張數，danger: 放槍危險度
+function reviewDiscard(room, seat, tile, candidates) {
+  const s = room.seats[seat];
+  const unseen = unseenCounts(room, seat);
+  const threats = threatsFor(room, seat);
+  const round2 = (x) => Math.round(x * 100) / 100;
+  const cur = evalDiscard(s.hand, s.melds.length, tile, unseen);
+  const best = chooseDiscard(room, seat, candidates);
+  return {
+    chosen: { sh: cur.sh, uk: cur.uk, danger: round2(dangerOf(room, seat, tile, unseen, threats)) },
+    best: { tile: best.tile, sh: best.sh, uk: best.uk, danger: round2(dangerOf(room, seat, best.tile, unseen, threats)) },
+    threat: round2(Math.max(...threats)),
+    defending: !!best.defending,
+  };
+}
+
+module.exports = { reviewDiscard, decideSwap, threatOf, dangerFor, passedBy, shanten, handShanten, unseenCounts, chooseDiscard, chooseWorst, decideClaim, decideKong, currentState };
