@@ -21,7 +21,7 @@ c=AI.decideClaim(r,1,{hu:false,pong:true,kong:false,chi:[]},31);
 const sh0=AI.currentState(r,1).sh;
 ok(c.type==='pass','門清、紅中對子、碰了向聽不會下降 → 不碰 (選 '+c.type+'，手牌向聽 '+sh0+')');
 // 3. 暗槓：四張都是孤立用不到的 → 暗槓 (多摸一張、仍算暗刻)
-r=mk(); r.seats[1].hand=[30,30,30,30,0,1,2,9,10,11,18,19,20,3,4,6,7];
+r=mk(); r.seats[1].hand=[30,30,30,30,0,1,2,9,10,11,18,19,20,3,4,6,7];r.seats[1].drawn=7;
 let k=AI.decideKong(r,1,r.selfActions(1));
 ok(k&&k.type==='angang'&&k.tile===30,'四張北、牌型不受影響 → 暗槓');
 // 4. 暗槓會拆掉順子用法 → 不槓：三萬×4 搭配 一二萬、四五萬
@@ -29,7 +29,7 @@ r=mk(); r.seats[1].hand=[2,2,2,2,0,1,3,4,9,10,11,18,19,20,27,27,33];
 k=AI.decideKong(r,1,r.selfActions(1));
 ok(!k||k.tile!==2,'四張三萬可拆成順子 → 不暗槓 ('+(k?k.type+' '+k.tile:'不槓')+')');
 // 5. 加槓：第 4 張本來就要打掉 → 加槓；有用的牌 → 不加槓
-r=mk(); r.seats[1].melds=[{type:'pong',tiles:[31,31,31]}];r.seats[1].hand=[31,0,1,2,9,10,11,18,19,20,3,4,27,27];
+r=mk(); r.seats[1].melds=[{type:'pong',tiles:[31,31,31]}];r.seats[1].hand=[31,0,1,2,9,10,11,18,19,20,3,4,27,27];r.seats[1].drawn=27;
 k=AI.decideKong(r,1,r.selfActions(1));
 ok(k&&k.type==='jiagang','碰過紅中、第 4 張紅中用不到 → 加槓');
 r=mk(); r.seats[1].melds=[{type:'pong',tiles:[3,3,3]}];r.seats[1].hand=[3,4,5,9,10,11,18,19,20,27,27,30,31,33];

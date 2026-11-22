@@ -501,8 +501,10 @@ class Room {
     const s = this.seats[i];
     const c = G.counts(s.hand);
     const angang = [];
-    for (let t = 0; t < 34; t++) if (c[t] === 4) angang.push(t);
-    const jiagang = s.melds.filter((m) => m.type === 'pong' && c[m.tiles[0]] >= 1).map((m) => m.tiles[0]);
+    // 碰/吃之後 (沒有摸牌) 只能出牌，不能槓
+    const justClaimed = s.drawn == null;
+    if (!justClaimed) for (let t = 0; t < 34; t++) if (c[t] === 4) angang.push(t);
+    const jiagang = justClaimed ? [] : s.melds.filter((m) => m.type === 'pong' && c[m.tiles[0]] >= 1).map((m) => m.tiles[0]);
     // 過水中連自摸都不行
     const hu = s.drawn != null && !s.noRon && !!this.evalWin(i, null, true);
     if (s.migi) return { hu, angang: [], jiagang: [], migi: [], locked: true };
@@ -607,10 +609,10 @@ class Room {
       } else if (s.migi) {
         // MIGI 後不可暗槓/加槓
       } else if (msg.type === 'angang') {
-        if (G.counts(s.hand)[msg.tile] === 4) this.doAngang(i, msg.tile);
+        if (s.drawn != null && G.counts(s.hand)[msg.tile] === 4) this.doAngang(i, msg.tile);
       } else if (msg.type === 'jiagang') {
         const m = s.melds.find((x) => x.type === 'pong' && x.tiles[0] === msg.tile);
-        if (m && s.hand.includes(msg.tile)) this.doJiagang(i, m);
+        if (s.drawn != null && m && s.hand.includes(msg.tile)) this.doJiagang(i, m);
       }
     } else if (this.phase === 'claim' && this.claims && this.claims[i] && !this.claims[i].resp) {
       this.respond(i, msg);
