@@ -5,8 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/run.js",
-    "test:quick": "FUZZ_GAMES=30 SIM_GAMES=15 node test/run.js",
+    "test": "FUZZ_GAMES=30 SIM_GAMES=15 node test/run.js",
+    "test:full": "node test/run.js",
     "test:ui": "node test/ui/run.js"
   },
   "dependencies": {
