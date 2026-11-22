@@ -247,6 +247,16 @@ $('tabMe').onclick = () => setHallTab('me');
 // 打牌習慣：向伺服器要檔案，收到後用 Blob 觸發瀏覽器下載
 $('habitMd').onclick = () => send({ type: 'habitExport', fmt: 'md' });
 $('habitJson').onclick = () => send({ type: 'habitExport', fmt: 'json' });
+$('habitClear').onclick = async () => {
+  const yes = await confirmDialog({
+    title: '清除打牌紀錄？',
+    body: '<p>會刪除你這個帳號所有的打牌習慣紀錄，<b>無法復原</b>。計分板的戰績與成就不受影響。</p>',
+    ok: '清除',
+    cancel: '取消',
+    danger: true,
+  });
+  if (yes) send({ type: 'habitClear' });
+};
 function downloadFile({ filename, content, fmt }) {
   const type = fmt === 'json' ? 'application/json' : 'text/markdown';
   const url = URL.createObjectURL(new Blob([content], { type: `${type};charset=utf-8` }));

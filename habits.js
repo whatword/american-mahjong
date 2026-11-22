@@ -1,6 +1,6 @@
 'use strict';
 // 打牌習慣紀錄：每位真人玩家 (以 email 區分) 一個 JSONL 檔，一行一個事件，只增不改。
-// 個人化頁面可以下載成「AI 分析檔 (.md)」或「原始資料 (.json)」，貼給任何 AI 就能得到打牌建議。
+// 個人化頁面可以下載「AI 分析檔 (.md)」和「原始資料 (.json)」，一起提供給任何 AI 就能得到打牌建議。
 // 電腦、離線由電腦代打的操作都不會記錄。
 const fs = require('fs');
 const path = require('path');
@@ -8,7 +8,8 @@ const crypto = require('crypto');
 
 const DIR = process.env.HABITS_DIR ||
   (process.env.STATS_FILE ? process.env.STATS_FILE + '.habits' : path.join(__dirname, 'data', 'habits'));
-const MD_HANDS = 30; // .md 只附最近幾局的逐步紀錄 (統計摘要永遠涵蓋全部)
+const MAX_HANDS = 20; // 每位玩家只保留最新幾局的紀錄
+const MD_HANDS = MAX_HANDS;
 
 // email 轉成固定長度的檔名，避免特殊字元造成路徑問題
 const fileOf = (email) => path.join(DIR, crypto.createHash('sha256').update(String(email)).digest('hex').slice(0, 24) + '.jsonl');
@@ -18,6 +19,7 @@ function log(email, ev) {
   try {
     fs.mkdirSync(DIR, { recursive: true });
     fs.appendFileSync(fileOf(email), JSON.stringify(ev) + '\n');
+    if (ev.k === 'end') prune(email);
   } catch (e) {
     console.error('打牌紀錄寫入失敗', e.message);
   }
@@ -32,6 +34,17 @@ function load(email) {
     try { out.push(JSON.parse(line)); } catch { /* 略過損毀的行 */ }
   }
   return out;
+}
+
+// 只留最新 MAX_HANDS 局 (依第一次出現的順序)；先寫暫存檔再改名，避免寫到一半損毀
+function prune(email) {
+  const events = load(email);
+  const hands = groupByHand(events);
+  if (hands.length <= MAX_HANDS) return;
+  const keep = hands.slice(-MAX_HANDS).flatMap((x) => x.events);
+  const file = fileOf(email);
+  fs.writeFileSync(file + '.tmp', keep.map((e) => JSON.stringify(e)).join('\n') + '\n');
+  fs.renameSync(file + '.tmp', file);
 }
 
 function clear(email) {
@@ -206,7 +219,7 @@ function exportMarkdown(email, name) {
   );
   L.push('## 遊戲規則與欄位說明', '', `- ${b.rules}`);
   for (const v of Object.values(b.fields)) L.push(`- ${v}`);
-  L.push('', '## 統計摘要（全部紀錄）', '');
+  L.push('', '## 統計摘要（最新 20 局以內的全部紀錄）', '');
   const d = s.discard, t = s.ting, c = s.claim;
   L.push(
     '| 項目 | 數值 |', '|---|---|',
@@ -243,4 +256,4 @@ function exportMarkdown(email, name) {
   return L.join('\n');
 }
 
-module.exports = { log, load, clear, summarize, exportJson, exportMarkdown, groupByHand, DIR };
+module.exports = { MAX_HANDS, log, load, clear, summarize, exportJson, exportMarkdown, groupByHand, DIR };

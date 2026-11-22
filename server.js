@@ -1235,6 +1235,11 @@ wss.on('connection', (ws) => {
       return send(ws, { type: 'habitFile', fmt, filename: `mahjong-habits-${date}.${fmt}`, content });
     }
 
+    if (msg.type === 'habitClear') {
+      Habits.clear(ws.user.email);
+      return send(ws, { type: 'toast', text: '已清除你的打牌紀錄' });
+    }
+
     // 大廳
     if (!ws.ctx) {
       if (msg.type === 'create') {
