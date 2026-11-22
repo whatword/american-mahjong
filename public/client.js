@@ -503,7 +503,8 @@ function renderGame() {
 
   // 中央資訊
   let info = '';
-  if (S.phase === 'discard') info = S.turn === me ? '<div class="big">輪到你出牌</div>' : `<div>等待 ${S.seats[S.turn].name} 出牌</div>`;
+  if (S.phase === 'lastDraw') info = S.turn === me ? '<div class="big">最後一張牌，你還沒聽牌</div><div>可以選擇不摸，直接流局</div>' : `<div>等待 ${S.seats[S.turn].name} 決定是否摸最後一張牌</div>`;
+  else if (S.phase === 'discard') info = S.turn === me ? '<div class="big">輪到你出牌</div>' : `<div>等待 ${S.seats[S.turn].name} 出牌</div>`;
   else if (S.phase === 'claim') info = `<div>${S.seats[S.last.from].name} ${S.last.rob ? '加槓' : '打出'} <b>${tileName(S.last.tile)}</b></div>` +
     (S.last.rob ? '<div>可搶槓</div>' : '') +
     (S.waiting && S.waiting.length ? `<div>等待 ${S.waiting.map((p) => S.seats[p].name).join('、')}</div>` : '');
@@ -687,6 +688,12 @@ function renderActionsInto(box) {
     box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: tip + '在其他三家面前各點一張蓋著的牌' }));
     return;
   }
+  if (S.phase === 'lastDraw') {
+    if (S.turn !== S.you) return;
+    btn('摸牌', '', () => send({ type: 'draw' }));
+    btn('不摸，直接結束', 'hu', () => send({ type: 'endhand' }));
+    return;
+  }
   if (S.phase === 'discard' && S.turn === S.you && S.actions) {
     const a = S.actions;
     if (a.hu) btn('自摸', 'hu', () => send({ type: 'hu' }));
@@ -810,7 +817,7 @@ function startTimer() {
   const upd = () => {
     const left = Math.max(0, Math.ceil((S.deadline - Date.now()) / 1000));
     const t = $('timer');
-    if (t && (S.phase === 'discard' || S.phase === 'claim' || S.phase === 'seatPick' || S.phase === 'dice' || S.phase.startsWith('swap'))) t.textContent = `⏱ ${left}s`;
+    if (t && (S.phase === 'discard' || S.phase === 'lastDraw' || S.phase === 'claim' || S.phase === 'seatPick' || S.phase === 'dice' || S.phase.startsWith('swap'))) t.textContent = `⏱ ${left}s`;
     const nt = $('nextTimer');
     if (nt && S.result && S.result.nextAt) nt.textContent = `${Math.max(0, Math.ceil((S.result.nextAt - Date.now()) / 1000))} 秒後自動開始`;
   };

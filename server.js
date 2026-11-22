@@ -473,10 +473,35 @@ class Room {
     if (this.wall.length <= DEAD_WALL) return this.endHand(null);
     this.seats[i].justDiscarded = null;
     this.seats[i].noPong.clear(); // 輪到自己 → 過碰解除
+    // 要摸最後一張牌、但還沒聽牌：可以選擇不摸，直接流局
+    const s = this.seats[i];
+    if (this.wall.length === DEAD_WALL + 1 && s.hand.length % 3 === 1 && G.waits(s.hand, s.melds.length).length === 0) {
+      this.turn = i;
+      this.phase = 'lastDraw';
+      this.claims = null;
+      this.setTimer(TURN_MS, () => this.lastDrawChoice(i, true));
+      this.broadcast();
+      this.maybeAct();
+      return;
+    }
+    this.doDraw(i);
+  }
+
+  doDraw(i) {
     this.kongDraw = false;
     this.drawFor(i, false);
     if (this.flowerWin()) return;
     this.enterDiscard(i);
+  }
+
+  // draw=true 摸最後一張牌繼續；false 不摸，直接流局
+  lastDrawChoice(i, draw) {
+    if (this.phase !== 'lastDraw' || this.turn !== i) return;
+    if (!draw) {
+      this.sys(`${this.seats[i].name} 未聽牌，選擇不摸最後一張牌`);
+      return this.endHand(null);
+    }
+    this.doDraw(i);
   }
 
   enterDiscard(i) {
@@ -581,6 +606,10 @@ class Room {
         else if (msg.type === 'skipswap') this.finishSwap();
       } else if (this.phase === 'swapSelect' && msg.type === 'cover') this.confirmCover(i, msg.tiles);
       else if (this.phase === 'swapPick' && msg.type === 'swappick') this.doPick(i, msg.picks);
+      return;
+    }
+    if (this.phase === 'lastDraw') {
+      if (this.turn === i && (msg.type === 'draw' || msg.type === 'endhand')) this.lastDrawChoice(i, msg.type === 'draw');
       return;
     }
     if (this.phase === 'discard' && this.turn === i) {
@@ -1052,6 +1081,10 @@ class Room {
     } else if (this.phase === 'swapPick') {
       const i = this.turn;
       if (this.isAuto(i)) setTimeout(() => { if (seq === this.seq && this.phase === 'swapPick' && this.turn === i) this.autoPick(i); }, BOT_DELAY);
+    } else if (this.phase === 'lastDraw' && this.isAuto(this.turn)) {
+      const i = this.turn;
+      // 電腦未聽牌：不摸，直接結束
+      setTimeout(() => { if (seq === this.seq && this.phase === 'lastDraw' && this.turn === i) this.lastDrawChoice(i, false); }, BOT_DELAY);
     } else if (this.phase === 'discard' && this.isAuto(this.turn)) {
       const i = this.turn;
       setTimeout(() => { if (seq === this.seq && this.phase === 'discard' && this.turn === i) this.botTurn(i); }, BOT_DELAY);
@@ -1276,7 +1309,7 @@ wss.on('connection', (ws) => {
       case 'removebot': if (seat === room.host()) room.removeSeat(Number(msg.seat)); break;
       case 'start': if (seat === room.host()) room.startGame(); break;
       case 'next': if (room.phase === 'over') room.nextHandIfReady(); break;
-      case 'seatpick': case 'roll': case 'swapstart': case 'skipswap': case 'cover': case 'swappick': case 'discard': case 'hu': case 'angang': case 'jiagang': case 'pass': case 'pong': case 'kong': case 'chi':
+      case 'seatpick': case 'roll': case 'swapstart': case 'skipswap': case 'cover': case 'swappick': case 'discard': case 'draw': case 'endhand': case 'hu': case 'angang': case 'jiagang': case 'pass': case 'pong': case 'kong': case 'chi':
         room.handle(seat, msg);
         break;
     }
