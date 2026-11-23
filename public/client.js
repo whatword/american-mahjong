@@ -768,9 +768,10 @@ function renderActionsInto(box) {
   }
   if (S.phase === 'discard' && S.turn === S.you && S.actions) {
     const a = S.actions;
-    if (a.hu) btn('自摸', 'hu', () => send({ type: 'hu' }));
+    // 可以自摸時，只顯示自摸按鈕 (不顯示 MIGI、暗槓、加槓)
+    if (a.hu) { btn('自摸', 'hu', () => send({ type: 'hu' })); return; }
     if (a.locked) {
-      if (!a.hu) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中：點兩下摸進的牌打出' }));
+      box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中：點兩下摸進的牌打出' }));
       return;
     }
     if (a.migi && a.migi.length) {
@@ -860,7 +861,7 @@ function renderResult() {
         resultTimer = null;
         resultShownKey = key;
         if (S && S.phase === 'over') renderResult();
-      }, S.result.draw ? 600 : 1500);
+      }, S.result.draw ? 600 : S.result.selfDraw && !S.result.special && fxActive() ? ZIMO_FX_MS + 200 : 1500);
     }
     return;
   }
@@ -1000,12 +1001,60 @@ function showSay(m) {
   }
   el.appendChild(line);
   speakSay(m);
+  if (m.kind === 'zimo' && m.fx) showZimoFx(m);
   // 同一位玩家的新對話框取代舊的
   if (sayEls[m.seat]) sayEls[m.seat].remove();
   sayEls[m.seat] = el;
   $('sayLayer').appendChild(el);
   placeSay(el, anchor, k);
   setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); if (sayEls[m.seat] === el) delete sayEls[m.seat]; }, 250); }, win ? 2200 : call ? 1600 : 1300);
+}
+
+// ---------- 自摸特效 ----------
+// 全螢幕暗幕 + 光芒，胡牌的整副牌放在正中間，下方依序顯示 4 台以上的牌型、門清一摸三 / 自摸
+const ZIMO_FX_MS = 4000;
+let fxEl = null;
+const fxActive = () => !!fxEl;
+function showZimoFx(m) {
+  const fx = m.fx;
+  if (fxEl) fxEl.remove();
+  const el = document.createElement('div');
+  el.id = 'zimoFx';
+  const rays = document.createElement('div');
+  rays.className = 'fx-rays';
+  el.appendChild(rays);
+  const box = document.createElement('div');
+  box.className = 'fx-box';
+  const who = document.createElement('div');
+  who.className = 'fx-who';
+  who.textContent = S.seats[m.seat] ? S.seats[m.seat].name : '';
+  box.appendChild(who);
+  const row = document.createElement('div');
+  row.className = 'fx-hand';
+  let n = 0;
+  const add = (node) => { node.style.setProperty('--i', n++); node.classList.add('fx-in'); row.appendChild(node); };
+  fx.hand.forEach((t) => add(tileEl(t, 'sm')));
+  fx.melds.forEach((mm) => add(meldEl(mm)));
+  if (fx.drawn != null) add(tileEl(fx.drawn, 'sm latest fx-drawn'));
+  box.appendChild(row);
+  const txt = document.createElement('div');
+  txt.className = 'fx-text';
+  fx.lines.forEach((l, k) => {
+    const d = document.createElement('div');
+    d.className = k === fx.lines.length - 1 ? 'fx-main' : 'fx-big';
+    d.textContent = l;
+    d.style.animationDelay = `${0.5 + k * 0.35}s`;
+    txt.appendChild(d);
+  });
+  box.appendChild(txt);
+  el.appendChild(box);
+  document.body.appendChild(el);
+  fxEl = el;
+  setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => { el.remove(); if (fxEl === el) fxEl = null; }, 400);
+  }, ZIMO_FX_MS - 400);
+  setTimeout(() => { if (fxEl === el) fxEl = null; }, ZIMO_FX_MS);
 }
 
 // 對話框位置：不能遮住海底的牌 (各家牌河、換牌蓋牌)，也盡量不蓋到其他人的對話框

@@ -2454,3 +2454,131 @@ button.danger {
 .spectator-hand .tile:active {
   transform: none !important;
 }
+
+/* ---------- 自摸特效 ---------- */
+#zimoFx {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, #5a0d0dcc 0%, #000000d9 75%);
+  animation: fx-fade .3s ease-out;
+  transition: opacity .4s;
+  overflow: hidden;
+}
+
+#zimoFx.out {
+  opacity: 0;
+}
+
+.fx-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220vmax;
+  height: 220vmax;
+  margin: -110vmax 0 0 -110vmax;
+  background: repeating-conic-gradient(from 0deg, #ffd47933 0deg 7deg, #0000 7deg 20deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, #0000 45%);
+  mask-image: radial-gradient(circle, #000 0%, #0000 45%);
+  animation: fx-spin 14s linear infinite;
+}
+
+.fx-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 96vw;
+  animation: fx-box-in .55s cubic-bezier(.2, 1.5, .4, 1);
+}
+
+.fx-who {
+  color: #ffe9b0;
+  font-size: 22px;
+  letter-spacing: .2em;
+  text-shadow: 0 2px 6px #000;
+}
+
+.fx-hand {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: #0b3a26e6;
+  border: 3px solid #ffd479;
+  box-shadow: 0 0 40px 8px #ffb53a99, inset 0 0 20px #000a;
+}
+
+.fx-hand .tile,
+.fx-hand .meld .tile {
+  font-size: min(38px, 5.2vw);
+}
+
+.fx-hand .meld {
+  display: flex;
+  margin: 0 0 0 .5em;
+}
+
+.fx-in {
+  opacity: 0;
+  animation: fx-tile-in .4s ease-out forwards;
+  animation-delay: calc(var(--i) * 35ms);
+}
+
+.fx-drawn {
+  margin-left: .5em;
+  box-shadow: 0 0 0 .06em #ffd479, 0 0 .5em .15em #ffd479;
+  animation: fx-tile-in .4s ease-out forwards, fx-glow 1s ease-in-out .6s infinite alternate;
+  animation-delay: calc(var(--i) * 35ms), .6s;
+}
+
+.fx-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.fx-big,
+.fx-main {
+  opacity: 0;
+  font-weight: 900;
+  color: #fff3c4;
+  text-shadow: 0 0 12px #ff9d00, 0 0 28px #ff5a00, 0 4px 0 #7a1d00;
+  animation: fx-text-in .5s cubic-bezier(.2, 1.8, .4, 1) forwards;
+}
+
+.fx-big {
+  font-size: min(54px, 9vw);
+  letter-spacing: .08em;
+}
+
+.fx-main {
+  font-size: min(88px, 14vw);
+  letter-spacing: .12em;
+  background: linear-gradient(#fff6c8, #ffc83a 55%, #ff7a1a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 14px #ff8a00) drop-shadow(0 4px 0 #7a1d00);
+}
+
+@keyframes fx-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fx-spin { to { transform: rotate(360deg); } }
+@keyframes fx-box-in { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes fx-tile-in { from { opacity: 0; transform: translateY(-30px) scale(1.4); } to { opacity: 1; transform: none; } }
+@keyframes fx-glow { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+@keyframes fx-text-in { from { opacity: 0; transform: scale(2.6); } to { opacity: 1; transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-rays { animation: none; }
+}

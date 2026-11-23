@@ -691,9 +691,29 @@ class Room {
 
   // 玩家「說話」：打牌、吃、碰、槓、胡時，在該玩家旁邊跳出對話框 (電腦也一樣)
   // 只是畫面效果，不存進牌局狀態
-  say(i, kind, tile = null, text = null) {
-    for (const s of this.seats) if (s && s.ws) send(s.ws, { type: 'say', seat: i, kind, tile, text });
-    for (const [sws] of this.spectators) if (sws.readyState === 1) send(sws, { type: 'say', seat: i, kind, tile, text });
+  say(i, kind, tile = null, text = null, fx = null) {
+    const msg = { type: 'say', seat: i, kind, tile, text };
+    if (fx) msg.fx = fx; // 自摸特效：胡牌的整副牌與牌型文字
+    for (const s of this.seats) if (s && s.ws) send(s.ws, msg);
+    for (const [sws] of this.spectators) if (sws.readyState === 1) send(sws, msg);
+  }
+
+  // 自摸特效的內容：胡牌的整副牌 (摸進的牌放最右)，以及要顯示的文字
+  // 第一行：4 台以上的牌型 (用 + 連接)；第二行：門清一摸三 (門清自摸 + 不求人) 或 自摸
+  zimoFx(win) {
+    const s = this.seats[win.winner];
+    const items = win.r.items;
+    const big = items.filter((x) => x.tai >= 4).map((x) => x.name);
+    const mq = items.some((x) => x.name === '門清') && items.some((x) => x.name === '不求人');
+    const hand = s.hand.slice();
+    const drawn = win.tile != null ? win.tile : s.drawn;
+    if (drawn != null && hand.includes(drawn)) hand.splice(hand.indexOf(drawn), 1);
+    return {
+      hand: sortTiles(hand), drawn: drawn != null ? drawn : null,
+      melds: s.melds.map((m) => ({ type: m.type, tiles: m.tiles, claimed: m.claimed })),
+      flowers: s.flowers,
+      lines: [...(big.length ? [big.join('+')] : []), mq ? '門清一摸三' : '自摸'],
+    };
   }
 
   doDiscard(i, tile, migi = false, how = null) {
@@ -963,7 +983,7 @@ class Room {
   endHand(win) {
     if (win) {
       const kind = win.special ? 'special' : win.selfDraw ? 'zimo' : this.last && this.last.rob ? 'rob' : 'hu';
-      this.say(win.winner, kind, win.tile, win.special || null);
+      this.say(win.winner, kind, win.tile, win.special || null, kind === 'zimo' ? this.zimoFx(win) : null);
     }
     clearTimeout(this.timer);
     this.seq++;
