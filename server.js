@@ -66,6 +66,7 @@ class Room {
   constructor(id) {
     this.id = id;
     this.seats = [null, null, null, null];
+    this.spectators = new Map(); // ws -> { name, email, viewSeat }
     this.state = 'lobby'; // lobby | playing
     this.scores = [START_SCORE, START_SCORE, START_SCORE, START_SCORE];
     this.dealer = 0;
@@ -105,7 +106,8 @@ class Room {
       if (idx < 0 || this.state === 'playing') return -1;
       this.seats[idx] = { name, token, ws, bot: false, hand: [], melds: [], flowers: [], discards: [], drawn: null };
     }
-    ws.ctx = { room: this, seat: idx };
+    if (this.spectators.has(ws)) this.spectators.delete(ws);
+    ws.ctx = { room: this, seat: idx, spectator: false };
     this.sys(`${this.seats[idx].name} 加入了房間`);
     this.broadcast();
     this.maybeAct();
@@ -113,8 +115,35 @@ class Room {
     return idx;
   }
 
+  joinSpectator(ws, name, email) {
+    if (this.state !== 'playing') {
+      send(ws, { type: 'toast', text: '遊戲尚未開始，無法觀戰' });
+      return false;
+    }
+    const defaultSeat = this.dealer >= 0 && this.dealer < 4 ? this.dealer : 0;
+    const spec = { name, email, viewSeat: defaultSeat };
+    this.spectators.set(ws, spec);
+    ws.ctx = { room: this, seat: -1, spectator: true, viewSeat: defaultSeat };
+    this.sys(`${name} 進入了觀戰`);
+    send(ws, this.viewForSpectator(ws));
+    hallChanged();
+    return true;
+  }
+
+  leaveSpectator(ws) {
+    if (this.spectators.has(ws)) {
+      this.spectators.delete(ws);
+      hallChanged();
+    }
+  }
+
   disconnect(ws) {
-    const idx = ws.ctx ? ws.ctx.seat : -1;
+    if (!ws.ctx) return;
+    if (ws.ctx.spectator) {
+      this.leaveSpectator(ws);
+      return;
+    }
+    const idx = ws.ctx.seat;
     if (idx < 0 || !this.seats[idx] || this.seats[idx].ws !== ws) return;
     const s = this.seats[idx];
     s.ws = null;
@@ -134,6 +163,13 @@ class Room {
     clearTimeout(this.timer);
     this.seq++;
     rooms.delete(this.id);
+    const specs = [...this.spectators.keys()];
+    this.spectators.clear();
+    for (const sws of specs) {
+      send(sws, { type: 'toast', text: '房間已關閉' });
+      sws.ctx = null;
+      sendHall(sws);
+    }
     hallChanged();
   }
 
@@ -657,6 +693,7 @@ class Room {
   // 只是畫面效果，不存進牌局狀態
   say(i, kind, tile = null, text = null) {
     for (const s of this.seats) if (s && s.ws) send(s.ws, { type: 'say', seat: i, kind, tile, text });
+    for (const [sws] of this.spectators) if (sws.readyState === 1) send(sws, { type: 'say', seat: i, kind, tile, text });
   }
 
   doDiscard(i, tile, migi = false, how = null) {
@@ -1174,10 +1211,29 @@ class Room {
     return v;
   }
 
+  viewForSpectator(ws) {
+    const spec = this.spectators.get(ws);
+    let viewSeat = spec ? spec.viewSeat : (this.dealer ?? 0);
+    if (!Number.isInteger(viewSeat) || viewSeat < 0 || viewSeat > 3 || !this.seats[viewSeat]) {
+      viewSeat = 0;
+    }
+    const v = this.view(viewSeat);
+    v.spectating = true;
+    v.spectatorSeat = viewSeat;
+    v.spectatorCount = this.spectators.size;
+    // 觀戰者只能觀看，移除所有操作按鈕與鳴牌選項
+    v.actions = null;
+    v.claim = null;
+    return v;
+  }
+
   broadcast() {
     for (let i = 0; i < 4; i++) {
       const s = this.seats[i];
       if (s && s.ws) send(s.ws, this.view(i));
+    }
+    for (const [sws] of this.spectators) {
+      if (sws.readyState === 1) send(sws, this.viewForSpectator(sws));
     }
   }
 }
@@ -1200,6 +1256,7 @@ function hallList(email) {
     title: r.title || `第 ${r.id} 桌`,
     state: r.state,
     count: r.seats.filter(Boolean).length,
+    spectators: r.spectators ? r.spectators.size : 0,
     players: r.seats.map((x) => (x ? x.name : null)),
     mine: r.seats.some((x) => x && !x.bot && x.token === email),
   }));
@@ -1233,6 +1290,21 @@ function enterRoom(ws, room) {
     send(ws, { type: 'toast', text: '房間已滿或遊戲已開始' });
     sendHall(ws);
   }
+}
+
+function spectateRoom(ws, room) {
+  const active = activeRoomOf(ws.user.email);
+  if (active && active !== room) return send(ws, { type: 'toast', text: `你還在「${active.title}」的牌局中，請先回到該房間` });
+  if (room.state !== 'playing') {
+    send(ws, { type: 'toast', text: '遊戲尚未開始，無法觀戰' });
+    return sendHall(ws);
+  }
+  // 如果此人本來就是這間房的玩家，回到原本座位
+  const mySeat = room.seats.findIndex((s) => s && !s.bot && s.token === ws.user.email);
+  if (mySeat >= 0) {
+    return enterRoom(ws, room);
+  }
+  room.joinSpectator(ws, ws.user.name, ws.user.email);
 }
 
 // ---------- WebSocket ----------
@@ -1291,7 +1363,39 @@ wss.on('connection', (ws) => {
         const room = rooms.get(String(msg.room || ''));
         if (!room) { send(ws, { type: 'toast', text: '房間不存在' }); return sendHall(ws); }
         enterRoom(ws, room);
+      } else if (msg.type === 'spectate' || msg.type === 'spectateRoom') {
+        const room = rooms.get(String(msg.room || ''));
+        if (!room) { send(ws, { type: 'toast', text: '房間不存在' }); return sendHall(ws); }
+        spectateRoom(ws, room);
       } else if (msg.type === 'hall') sendHall(ws);
+      return;
+    }
+
+    // 觀戰者處理
+    if (ws.ctx.spectator) {
+      const { room } = ws.ctx;
+      switch (msg.type) {
+        case 'leave':
+          room.leaveSpectator(ws);
+          ws.ctx = null;
+          sendHall(ws);
+          break;
+        case 'switchView': {
+          const seat = Number(msg.seat);
+          if (Number.isInteger(seat) && seat >= 0 && seat < 4 && room.seats[seat]) {
+            ws.ctx.viewSeat = seat;
+            const spec = room.spectators.get(ws);
+            if (spec) spec.viewSeat = seat;
+            send(ws, room.viewForSpectator(ws));
+          }
+          break;
+        }
+        case 'chat':
+          send(ws, { type: 'toast', text: '觀戰模式無法發言' });
+          break;
+        default:
+          break;
+      }
       return;
     }
 
@@ -1316,7 +1420,13 @@ wss.on('connection', (ws) => {
         break;
     }
   });
-  ws.on('close', () => { if (ws.ctx) ws.ctx.room.disconnect(ws); ws.ctx = null; });
+  ws.on('close', () => {
+    if (ws.ctx) {
+      if (ws.ctx.spectator) ws.ctx.room.leaveSpectator(ws);
+      else ws.ctx.room.disconnect(ws);
+    }
+    ws.ctx = null;
+  });
   ws.on('error', () => {});
 });
 

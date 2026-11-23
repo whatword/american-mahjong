@@ -150,13 +150,23 @@ function renderHall() {
     card.className = 'roomcard' + (r.mine ? ' mine' : '');
     const status = r.state === 'playing' ? '<span class="tag playing">遊戲中</span>' : '<span class="tag waiting">等待中</span>';
     const seats = r.players.map((n) => `<li>${n ? escapeHtml(n) : '<em>空位</em>'}</li>`).join('');
-    card.innerHTML = `<div class="rtitle">${escapeHtml(r.title)} ${status}</div><div class="rcount">${r.count} / 4 人</div><ul>${seats}</ul>`;
+    const specText = r.spectators ? ` <span class="spec-count">(${r.spectators} 人觀戰)</span>` : '';
+    card.innerHTML = `<div class="rtitle">${escapeHtml(r.title)} ${status}</div><div class="rcount">${r.count} / 4 人${specText}</div><ul>${seats}</ul>`;
     const b = document.createElement('button');
-    if (r.mine) b.textContent = '回到房間';
-    else if (r.state === 'playing') { b.textContent = '遊戲中'; b.disabled = true; }
-    else if (r.count >= 4) { b.textContent = '已滿'; b.disabled = true; }
-    else b.textContent = '加入';
-    b.onclick = () => send({ type: 'joinRoom', room: r.id });
+    if (r.mine) {
+      b.textContent = '回到房間';
+      b.onclick = () => send({ type: 'joinRoom', room: r.id });
+    } else if (r.state === 'playing') {
+      b.textContent = '觀戰';
+      b.className = 'spectate-btn';
+      b.onclick = () => send({ type: 'spectate', room: r.id });
+    } else if (r.count >= 4) {
+      b.textContent = '已滿';
+      b.disabled = true;
+    } else {
+      b.textContent = '加入';
+      b.onclick = () => send({ type: 'joinRoom', room: r.id });
+    }
     card.appendChild(b);
     list.appendChild(card);
   }
@@ -405,9 +415,10 @@ function coverEl(i, pickable) {
 
 function renderGame() {
   updateUnread();
+  const isSpectator = !!S.spectating;
   const me = S.you;
-  const swapMode = S.phase === 'swapSelect' && !S.seats[me].confirmed; // 我正在選要蓋的 3 張牌
-  const pickMode = S.phase === 'swapPick' && S.turn === me; // 輪到我取牌
+  const swapMode = S.phase === 'swapSelect' && !S.seats[me].confirmed && !isSpectator; // 我正在選要蓋的 3 張牌
+  const pickMode = S.phase === 'swapPick' && S.turn === me && !isSpectator; // 輪到我取牌
   const key = `${S.handNo}-${S.phase}-${S.swapLeft}-${pickMode ? S.turn : ''}`;
   if (key !== swapKey) { swapKey = key; swapSel = []; swapPicks = {}; }
   // 換牌取牌：某一家只剩一張蓋牌可取時，直接幫玩家選好
@@ -421,7 +432,11 @@ function renderGame() {
   }
   const rel = (k) => (me + k) % 4; // k: 0 自己, 1 下家(右), 2 對家, 3 上家(左)
 
-  $('topbar').innerHTML = `<button id="backHallBtn" class="ghost small">回大廳</button><span>${S.title}</span><span>第 ${S.jiang} 將 ・ ${WINDS[S.round]}風圈 ・ 第 ${S.handNo} 局</span>` +
+  const specBadge = isSpectator ? '<span class="tag spectating-tag">👀 觀戰中</span>' : '';
+  const specCountText = isSpectator && S.spectatorCount > 1 ? `<span class="opt">(${S.spectatorCount} 人觀戰)</span>` : '';
+  const backBtnText = isSpectator ? '離開觀戰' : '回大廳';
+
+  $('topbar').innerHTML = `<button id="backHallBtn" class="ghost small">${backBtnText}</button>${specBadge}<span>${S.title}</span>${specCountText}<span>第 ${S.jiang} 將 ・ ${WINDS[S.round]}風圈 ・ 第 ${S.handNo} 局</span>` +
     `<span>莊家：${S.seats[S.dealer].name}</span>` +
     (S.breakInfo ? `<span class="opt2">開門：${S.seats[S.breakInfo.owner].name} 牌牆第 ${S.breakInfo.stack} 墩</span>` : '') +
     `<span>剩餘牌數：${S.wall}</span><span class="opt">底${S.base} / 每台${S.taiValue}</span>` +
@@ -436,6 +451,10 @@ function renderGame() {
   };
 
   $('backHallBtn').onclick = async () => {
+    if (isSpectator) {
+      send({ type: 'leave' });
+      return;
+    }
     const alone = S.seats.every((x, k) => k === S.you || !x || x.bot || !x.online);
     const yes = await confirmDialog({
       title: '要離開牌局嗎？',
@@ -455,7 +474,14 @@ function renderGame() {
     const wind = WINDS[(i - S.dealer + 4) % 4];
     if (k !== 0) {
       const seatEl = $('seat' + k);
-      seatEl.className = 'seat ' + ['', 'right', 'top', 'left'][k] + (S.phase !== 'over' && S.turn === i ? ' turn' : '');
+      seatEl.className = 'seat ' + ['', 'right', 'top', 'left'][k] + (S.phase !== 'over' && S.turn === i ? ' turn' : '') + (isSpectator ? ' spectator-clickable' : '');
+      if (isSpectator) {
+        seatEl.title = `點擊切換至 ${s.name} 的視角`;
+        seatEl.onclick = () => send({ type: 'switchView', seat: i });
+      } else {
+        seatEl.title = '';
+        seatEl.onclick = null;
+      }
       const el = document.createElement('div'); // 先畫在暫存容器，最後差異更新到畫面
       const nm = document.createElement('div');
       nm.className = 'nm';
@@ -504,19 +530,38 @@ function renderGame() {
 
   // 中央資訊
   let info = '';
-  if (S.phase === 'lastDraw') info = S.turn === me ? '<div class="big">最後一張牌，你還沒聽牌</div><div>可以選擇不摸，直接流局</div>' : `<div>等待 ${S.seats[S.turn].name} 決定是否摸最後一張牌</div>`;
-  else if (S.phase === 'discard') info = S.turn === me ? '<div class="big">輪到你出牌</div>' : `<div>等待 ${S.seats[S.turn].name} 出牌</div>`;
-  else if (S.phase === 'claim') info = `<div>${S.seats[S.last.from].name} ${S.last.rob ? '加槓' : '打出'} <b>${tileName(S.last.tile)}</b></div>` +
-    (S.last.rob ? '<div>可搶槓</div>' : '') +
-    (S.waiting && S.waiting.length ? `<div>等待 ${S.waiting.map((p) => S.seats[p].name).join('、')}</div>` : '');
-  else if (S.phase === 'dice' && S.dice) info = diceInfo();
-  else if (S.phase === 'seatPick' && S.seatPick) info = '';
-  else if (S.phase.startsWith('swap')) {
+  if (S.phase === 'lastDraw') {
+    info = (S.turn === me && !isSpectator)
+      ? '<div class="big">最後一張牌，你還沒聽牌</div><div>可以選擇不摸，直接流局</div>'
+      : `<div>等待 ${S.seats[S.turn].name} 決定是否摸最後一張牌</div>`;
+  } else if (S.phase === 'discard') {
+    info = (S.turn === me && !isSpectator)
+      ? '<div class="big">輪到你出牌</div>'
+      : (S.turn === me && isSpectator)
+        ? `<div class="big">輪到 ${S.seats[me].name} 出牌（當前視角）</div>`
+        : `<div>等待 ${S.seats[S.turn].name} 出牌</div>`;
+  } else if (S.phase === 'claim') {
+    info = `<div>${S.seats[S.last.from].name} ${S.last.rob ? '加槓' : '打出'} <b>${tileName(S.last.tile)}</b></div>` +
+      (S.last.rob ? '<div>可搶槓</div>' : '') +
+      (S.waiting && S.waiting.length ? `<div>等待 ${S.waiting.map((p) => S.seats[p].name).join('、')}</div>` : '');
+  } else if (S.phase === 'dice' && S.dice) {
+    info = diceInfo();
+  } else if (S.phase === 'seatPick' && S.seatPick) {
+    info = '';
+  } else if (S.phase.startsWith('swap')) {
     const left = `<div>還可換 ${S.swapLeft} 次</div>`;
     const done = S.seats.filter((s) => s.confirmed).length;
-    if (S.phase === 'swapAsk') info = S.dealer === me ? `<div class="big">你是莊家，要換牌嗎？</div>${left}` : `<div>莊家 ${S.seats[S.dealer].name} 考慮換牌中</div>${left}`;
-    else if (S.phase === 'swapSelect') info = `<div class="big">換牌：選 3 張蓋牌</div><div>已確定 ${done}/4 人</div>`;
-    else info = pickMode ? `<div class="big">輪到你取牌</div><div>從其他三家各取一張</div>` : `<div>輪到 ${S.seats[S.turn].name} 取牌</div>`;
+    if (S.phase === 'swapAsk') {
+      info = (S.dealer === me && !isSpectator)
+        ? `<div class="big">你是莊家，要換牌嗎？</div>${left}`
+        : `<div>莊家 ${S.seats[S.dealer].name} 考慮換牌中</div>${left}`;
+    } else if (S.phase === 'swapSelect') {
+      info = `<div class="big">換牌：選 3 張蓋牌</div><div>已確定 ${done}/4 人</div>`;
+    } else {
+      info = pickMode
+        ? `<div class="big">輪到你取牌</div><div>從其他三家各取一張</div>`
+        : `<div>輪到 ${S.seats[S.turn].name} 取牌</div>`;
+    }
   }
   info += `<div class="timer" id="timer"></div>`;
   $('info').innerHTML = info;
@@ -524,9 +569,10 @@ function renderGame() {
 
   // 我的牌
   const wind = WINDS[(me - S.dealer + 4) % 4];
-  const myTurn = S.phase === 'discard' && S.turn === me;
+  const myTurn = S.phase === 'discard' && S.turn === me && !isSpectator;
   const mm = document.createElement('div');
-  mm.innerHTML = `<span style="margin-right:10px">${wind} ${S.seats[me].name}${me === S.dealer ? ' 莊' : ''}${me === S.dealer && S.streak ? ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` : ''} 💰${S.scores[me]}</span>` +
+  const viewingBadge = isSpectator ? '<span class="tag viewing-tag">當前視角</span>' : '';
+  mm.innerHTML = `<span style="margin-right:10px">${wind} ${S.seats[me].name}${viewingBadge}${me === S.dealer ? ' 莊' : ''}${me === S.dealer && S.streak ? ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` : ''} 💰${S.scores[me]}</span>` +
     (S.seats[me].migi ? '<span class="migi-badge">MIGI</span>' : '');
   S.seats[me].melds.forEach((m) => mm.appendChild(meldEl(m)));
   if (S.myTaken && S.myTaken.length) {
@@ -543,28 +589,30 @@ function renderGame() {
   patchChildren($('myMelds'), [...mm.childNodes]);
 
   const handEl = $('myHand');
-  handEl.className = 'row' + (myTurn || swapMode ? '' : ' disabled');
+  handEl.className = 'row' + (myTurn || swapMode ? '' : ' disabled') + (isSpectator ? ' spectator-hand' : '');
   const hand = document.createElement('div');
   const addTile = (t, cls, idx) => {
     const e = tileEl(t, cls);
-    // 選取中的牌：上浮、黃框發光，上方標示下一步要做什麼
-    const tag = (text) => e.appendChild(Object.assign(document.createElement('span'), { className: 'seltag', textContent: text }));
-    if (myTurn && selected === idx) { e.classList.add('sel'); tag('再點一次打出'); }
-    if (swapMode && swapSel.includes(idx)) { e.classList.add('sel'); tag('蓋牌'); }
-    e.onclick = () => {
-      if (swapMode) {
-        const p = swapSel.indexOf(idx);
-        if (p >= 0) swapSel.splice(p, 1);
-        else if (swapSel.length < 3) swapSel.push(idx);
-        renderGame();
-        return;
-      }
-      if (!myTurn) return;
-      if (S.actions && S.actions.locked && idx !== 'drawn') return toast('MIGI 中只能打出摸進的牌');
-      if (S.actions && S.actions.forbid && S.actions.forbid.includes(t)) return toast(`剛吃碰完，不能馬上打出 ${tileName(t)}`);
-      if (selected === idx) { selected = null; send({ type: 'discard', tile: t }); }
-      else { selected = idx; renderGame(); }
-    };
+    if (!isSpectator) {
+      // 選取中的牌：上浮、黃框發光，上方標示下一步要做什麼
+      const tag = (text) => e.appendChild(Object.assign(document.createElement('span'), { className: 'seltag', textContent: text }));
+      if (myTurn && selected === idx) { e.classList.add('sel'); tag('再點一次打出'); }
+      if (swapMode && swapSel.includes(idx)) { e.classList.add('sel'); tag('蓋牌'); }
+      e.onclick = () => {
+        if (swapMode) {
+          const p = swapSel.indexOf(idx);
+          if (p >= 0) swapSel.splice(p, 1);
+          else if (swapSel.length < 3) swapSel.push(idx);
+          renderGame();
+          return;
+        }
+        if (!myTurn) return;
+        if (S.actions && S.actions.locked && idx !== 'drawn') return toast('MIGI 中只能打出摸進的牌');
+        if (S.actions && S.actions.forbid && S.actions.forbid.includes(t)) return toast(`剛吃碰完，不能馬上打出 ${tileName(t)}`);
+        if (selected === idx) { selected = null; send({ type: 'discard', tile: t }); }
+        else { selected = idx; renderGame(); }
+      };
+    }
     hand.appendChild(e);
   };
   // 打出後能聽牌的牌，在牌上加小標記
@@ -581,7 +629,7 @@ function renderGame() {
   if (S.drawn != null) addTile(S.drawn, 'drawn' + tingable(S.drawn) + swapped(S.drawn), 'drawn');
   patchChildren(handEl, [...hand.childNodes]);
   // 有選牌時，其他牌稍微變暗，讓選到的牌更突出
-  handEl.classList.toggle('has-sel', !!handEl.querySelector('.tile.sel'));
+  handEl.classList.toggle('has-sel', !isSpectator && !!handEl.querySelector('.tile.sel'));
   if (!myTurn) selected = null;
 
   renderTing(myTurn);
@@ -656,6 +704,29 @@ function renderActions() {
 }
 
 function renderActionsInto(box) {
+  if (S.spectating) {
+    const bar = document.createElement('div');
+    bar.className = 'spectator-bar';
+    const lbl = document.createElement('span');
+    lbl.className = 'spec-lbl';
+    lbl.textContent = '👀 觀看視角：';
+    bar.appendChild(lbl);
+    for (let i = 0; i < 4; i++) {
+      const s = S.seats[i];
+      if (!s) continue;
+      const wind = WINDS[(i - S.dealer + 4) % 4];
+      const isCurrent = i === S.you;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'spec-seat-btn' + (isCurrent ? ' active' : '');
+      b.textContent = `${wind}・${s.name}${i === S.dealer ? ' 莊' : ''}${isCurrent ? ' ✓' : ''}`;
+      b.title = isCurrent ? '目前正在觀看此角色' : `切換至 ${s.name} 視角`;
+      b.onclick = () => { if (!isCurrent) send({ type: 'switchView', seat: i }); };
+      bar.appendChild(b);
+    }
+    box.appendChild(bar);
+    return;
+  }
   if (S.phase === 'seatPick') return;
   if (S.phase === 'dice') {
     if (S.dice && S.dice.thrower === S.you && !S.dice.values) btn('🎲 擲骰子', 'hu', () => send({ type: 'roll' }));
@@ -748,6 +819,15 @@ function updateUnread() {
 }
 $('chatClose').onclick = () => { document.body.classList.remove('chat-open'); if (S) renderGame(); };
 function renderChat() {
+  const isSpectator = !!(S && S.spectating);
+  const inp = $('chatInput');
+  const btnEl = $('chatForm').querySelector('button');
+  if (inp) {
+    inp.disabled = isSpectator;
+    inp.placeholder = isSpectator ? '觀戰模式無法發言' : '聊天...';
+  }
+  if (btnEl) btnEl.disabled = isSpectator;
+
   const log = $('chatlog');
   const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
   log.innerHTML = '';
@@ -761,6 +841,7 @@ function renderChat() {
 }
 $('chatForm').onsubmit = (e) => {
   e.preventDefault();
+  if (S && S.spectating) return;
   const v = $('chatInput').value.trim();
   if (v) send({ type: 'chat', text: v });
   $('chatInput').value = '';
@@ -807,10 +888,11 @@ function renderResult() {
     return `<tr><td>${s.name}</td><td>${S.scores[i]}</td><td class="${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</td></tr>`;
   }).join('') + '</table>';
   if (r.jiangOver) h += `<p class="big" style="color:#f4c542">第 ${r.jiang} 將結束！下一將重新選座位、擲骰決定莊家</p>`;
-  h += `<button id="nextBtn">${r.jiangOver ? '下一將' : '下一局'}</button> <span class="timer" id="nextTimer"></span></div>`;
+  const nextBtnHtml = S.spectating ? '' : `<button id="nextBtn">${r.jiangOver ? '下一將' : '下一局'}</button> `;
+  h += `${nextBtnHtml}<span class="timer" id="nextTimer"></span></div>`;
   m.innerHTML = h;
   m.classList.remove('hidden');
-  $('nextBtn').onclick = () => send({ type: 'next' });
+  if (!S.spectating) $('nextBtn').onclick = () => send({ type: 'next' });
 }
 
 function startTimer() {
@@ -842,7 +924,7 @@ function diceInfo() {
   const thrower = S.seats[d.thrower].name;
   const title = d.stage === 'dealer' ? '擲骰決定起莊' : `莊家 ${thrower} 擲骰開門`;
   if (!d.values) {
-    const wait = d.thrower === S.you ? '<div class="big">請擲骰子</div>' : `<div>等待 ${thrower} 擲骰子…</div>`;
+    const wait = (d.thrower === S.you && !S.spectating) ? '<div class="big">請擲骰子</div>' : `<div>等待 ${thrower} 擲骰子…</div>`;
     return `<div>${title}</div>${wait}<div class="dice">${'<span class="die idle">⚀</span>'.repeat(3)}</div>`;
   }
   const key = `${S.handNo}-${d.stage}-${d.rolledAt}`;
@@ -859,10 +941,10 @@ function diceInfo() {
 // 每將開始：海底擺東南西北，點選一張決定座位
 function renderSeatPick(box) {
   const sp = S.seatPick;
-  const mySlot = sp.slots.find((x) => x.owner === S.you);
+  const mySlot = !S.spectating ? sp.slots.find((x) => x.owner === S.you) : null;
   const mine = mySlot ? mySlot.wind : undefined;
   box.innerHTML = `<div class="big">第 ${S.jiang} 將：選擇座位</div>` +
-    `<div>${sp.done ? '座位已決定，東家擲骰決定起莊…' : mine !== undefined ? `你翻到「${WINDS[mine]}」，等待其他玩家…` : '風牌蓋著，點選一張翻開決定你的座位'}</div>`;
+    `<div>${sp.done ? '座位已決定，東家擲骰決定起莊…' : S.spectating ? '玩家正在選擇座位…' : mine !== undefined ? `你翻到「${WINDS[mine]}」，等待其他玩家…` : '風牌蓋著，點選一張翻開決定你的座位'}</div>`;
   const row = document.createElement('div');
   row.className = 'seatpick';
   sp.slots.forEach((slot, k) => {
@@ -873,8 +955,8 @@ function renderSeatPick(box) {
     if (slot.wind !== null) t = tileEl(27 + slot.wind, 'taken');
     else {
       t = document.createElement('div');
-      t.className = 'tile facedown' + (mine === undefined && !sp.done ? ' pickable' : '');
-      if (mine === undefined && !sp.done) t.onclick = () => send({ type: 'seatpick', slot: k });
+      t.className = 'tile facedown' + (mine === undefined && !sp.done && !S.spectating ? ' pickable' : '');
+      if (mine === undefined && !sp.done && !S.spectating) t.onclick = () => send({ type: 'seatpick', slot: k });
     }
     cell.appendChild(t);
     const nm = document.createElement('div');

@@ -2260,3 +2260,197 @@ button.danger {
     box-shadow: 0 0 14px rgba(255, 90, 0, 1);
   }
 }
+
+/* 觀戰模式 */
+.tag.spectating-tag {
+  background: #2563eb;
+  color: #fff;
+  font-weight: bold;
+}
+
+.tag.viewing-tag {
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.spec-count {
+  font-size: 12px;
+  color: #60a5fa;
+  margin-left: 4px;
+  font-weight: normal;
+}
+
+.spectate-btn {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+
+.spectate-btn:hover {
+  background: #1d4ed8 !important;
+}
+
+.spectator-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.spec-lbl {
+  font-size: 13px;
+  color: #93c5fd;
+  font-weight: bold;
+}
+
+.spec-seat-btn {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.spec-seat-btn:hover {
+  background: #334155;
+  border-color: #94a3b8;
+  color: #fff;
+}
+
+.spec-seat-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #60a5fa;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  font-weight: bold;
+}
+
+.seat.spectator-clickable {
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.15s ease;
+}
+
+.seat.spectator-clickable:hover {
+  outline: 2px dashed #60a5fa;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.spectator-hand .tile {
+  cursor: default !important;
+}
+
+.spectator-hand .tile:hover,
+.spectator-hand .tile:active {
+  transform: none !important;
+}
+
+/* 觀戰模式 */
+.tag.spectating-tag {
+  background: #2563eb;
+  color: #fff;
+  font-weight: bold;
+}
+
+.tag.viewing-tag {
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.spec-count {
+  font-size: 12px;
+  color: #60a5fa;
+  margin-left: 4px;
+  font-weight: normal;
+}
+
+.spectate-btn {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+
+.spectate-btn:hover {
+  background: #1d4ed8 !important;
+}
+
+.spectator-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.spec-lbl {
+  font-size: 13px;
+  color: #93c5fd;
+  font-weight: bold;
+}
+
+.spec-seat-btn {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.spec-seat-btn:hover {
+  background: #334155;
+  border-color: #94a3b8;
+  color: #fff;
+}
+
+.spec-seat-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #60a5fa;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  font-weight: bold;
+}
+
+.seat.spectator-clickable {
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.15s ease;
+}
+
+.seat.spectator-clickable:hover {
+  outline: 2px dashed #60a5fa;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.spectator-hand .tile {
+  cursor: default !important;
+}
+
+.spectator-hand .tile:hover,
+.spectator-hand .tile:active {
+  transform: none !important;
+}
