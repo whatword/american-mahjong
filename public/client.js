@@ -928,35 +928,68 @@ function showSay(m) {
 
 // 對話框位置：不能遮住海底的牌 (各家牌河、換牌蓋牌)，也盡量不蓋到其他人的對話框
 // 電腦版：放在牌桌中央的空位 (海底裡沒有牌的地方)，由靠近說話玩家的位置先挑
-// 手機版：放在使用者自己的手牌區
+// 手機版：放在說話玩家的手牌／座位區域 (對家在上方、上家在左、下家在右、自己在下方)
 function placeSay(el, anchor, k) {
   const w = el.offsetWidth, h = el.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
   const rects = (sel) => [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect()).filter((r) => r.width && r.height);
   const others = [...document.querySelectorAll('#sayLayer .say')].filter((e) => e !== el && !e.classList.contains('out')).map((e) => e.getBoundingClientRect());
   const area = (x, y, r) => Math.max(0, Math.min(x + w, r.right) - Math.max(x, r.left)) * Math.max(0, Math.min(y + h, r.bottom) - Math.max(y, r.top));
   const sum = (x, y, list) => list.reduce((t, r) => t + area(x, y, r), 0);
   const mobile = window.matchMedia('(max-width: 1000px)').matches;
-  const box = ($(mobile ? 'me' : 'center') || anchor).getBoundingClientRect();
   const pool = rects('#center .pool .tile, #center .cover');
   const hand = rects('#myHand .tile');
   const a = anchor.getBoundingClientRect();
   const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
-  const x0 = box.left + 4, x1 = Math.max(x0, box.right - w - 4);
-  const y0 = box.top + 4, y1 = Math.max(y0, box.bottom - h - 4);
+
+  let x0, x1, y0, y1;
+  if (mobile) {
+    if (k === 3) {
+      // 上家 (左)：在左側玩家區域，沿垂直方向挑選不遮海底的位置
+      x0 = Math.max(2, Math.min(vw - w - 4, a.left + 2));
+      x1 = Math.max(x0, Math.min(vw - w - 4, a.left + 6));
+      y0 = Math.max(4, a.top + 4);
+      y1 = Math.max(y0, Math.min(vh - h - 4, a.bottom - h - 4));
+    } else if (k === 1) {
+      // 下家 (右)：在右側玩家區域，沿垂直方向挑選不遮海底的位置
+      x0 = Math.max(4, Math.min(vw - w - 2, a.right - w - 6));
+      x1 = Math.max(x0, Math.min(vw - w - 2, a.right - w - 2));
+      y0 = Math.max(4, a.top + 4);
+      y1 = Math.max(y0, Math.min(vh - h - 4, a.bottom - h - 4));
+    } else if (k === 2) {
+      // 對家 (上)：在上方對家手牌／座位區
+      const cx = a.left + (a.width - w) / 2;
+      x0 = Math.max(4, Math.min(vw - w - 4, cx - 16));
+      x1 = Math.max(x0, Math.min(vw - w - 4, cx + 16));
+      y0 = Math.max(4, a.top + 2);
+      y1 = Math.max(y0, Math.min(vh - h - 4, a.bottom - h - 2));
+    } else {
+      // 自己 (下)：在自己的手牌／操作區上方，避開手牌
+      x0 = Math.max(4, a.left + 4);
+      x1 = Math.max(x0, Math.min(vw - w - 4, a.right - w - 4));
+      y0 = Math.max(4, a.top + 2);
+      y1 = Math.max(y0, Math.min(vh - h - 4, a.bottom - h - 4));
+    }
+  } else {
+    const box = ($('center') || anchor).getBoundingClientRect();
+    x0 = box.left + 4;
+    x1 = Math.max(x0, box.right - w - 4);
+    y0 = box.top + 4;
+    y1 = Math.max(y0, box.bottom - h - 4);
+  }
+
   let best = null;
-  const N = 14;
+  const N = 16;
   for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
     const x = x0 + ((x1 - x0) * i) / N, y = y0 + ((y1 - y0) * j) / N;
-    // 先比遮住的牌 (海底最重要，其次是別人的對話框)，再比離說話玩家的距離
-    const c = mobile
-      ? sum(x, y, others) * 4 + sum(x, y, hand) * 0.01 + y * 0.001
-      : sum(x, y, pool) * 10 + sum(x, y, others) * 4;
-    const d = mobile ? 0 : Math.hypot(x + w / 2 - ax, y + h / 2 - ay);
+    // 先比遮住的牌 (海底最重要，其次是別人的對話框；自己喊牌時避開自己的手牌)，再比離說話玩家的距離
+    const c = sum(x, y, pool) * 20 + sum(x, y, others) * 4 + (k === 0 ? sum(x, y, hand) * 0.05 : 0);
+    const d = Math.hypot(x + w / 2 - ax, y + h / 2 - ay);
     if (!best || c < best.c - 1 || (Math.abs(c - best.c) <= 1 && d < best.d)) best = { x, y, c, d };
   }
-  el.style.left = best.x + 'px';
-  el.style.top = best.y + 'px';
-  el.classList.add('inside'); // 對話框在牌桌中央或手牌區，不需要指向座位的小尾巴
+  el.style.left = (best ? best.x : x0) + 'px';
+  el.style.top = (best ? best.y : y0) + 'px';
+  el.classList.add('inside'); // 對話框在牌桌中央或座位區，不需要指向座位的小尾巴
 }
 
 // ---------- 語音朗讀 (瀏覽器內建 Web Speech API) ----------
