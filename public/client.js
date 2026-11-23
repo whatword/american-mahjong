@@ -900,7 +900,7 @@ function startTimer() {
   const upd = () => {
     const left = Math.max(0, Math.ceil((S.deadline - Date.now()) / 1000));
     const t = $('timer');
-    if (t && (S.phase === 'discard' || S.phase === 'lastDraw' || S.phase === 'claim' || S.phase === 'seatPick' || S.phase === 'dice' || S.phase.startsWith('swap'))) t.textContent = `⏱ ${left}s`;
+    if (t && (S.phase === 'discard' || S.phase === 'lastDraw' || S.phase === 'claim' || S.phase === 'seatPick' || S.phase === 'dice' || S.phase.startsWith('swap'))) t.textContent = `⏱ ${left}s` + (S.wall > 0 && S.phase !== 'seatPick' && S.phase !== 'dice' && !S.phase.startsWith('swap') ? ` ｜ 剩餘 ${S.wall} 張` : '');
     const nt = $('nextTimer');
     if (nt && S.result && S.result.nextAt) nt.textContent = `${Math.max(0, Math.ceil((S.result.nextAt - Date.now()) / 1000))} 秒後自動開始`;
   };
