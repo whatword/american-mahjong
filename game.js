@@ -248,7 +248,24 @@ function evaluate(ctx) {
   return candidates[0];
 }
 
-function finalize(items) {
+const DRAGON_NAMES = new Set(['紅中', '發財', '白板']);
+
+// 不可重複計算：有左邊的項目時，右邊的項目不再計入
+const EXCLUDES = [
+  ['全求人', (n) => n === '獨聽'],
+  ['MIGI', (n) => n === '門清' || n === '不求人'],
+  ['嚦咕嚦咕', (n) => n === '門清' || n === '不求人'],
+  ['五暗刻', (n) => n === '四暗刻' || n === '三暗刻'],
+  ['四暗刻', (n) => n === '三暗刻'],
+  ['大三元', (n) => DRAGON_NAMES.has(n)],
+  ['小三元', (n) => DRAGON_NAMES.has(n)],
+  ['大四喜', (n) => n.startsWith('圈風') || n.startsWith('門風')],
+  ['小四喜', (n) => n.startsWith('圈風') || n.startsWith('門風')],
+];
+
+function finalize(all) {
+  const names = new Set(all.map((i) => i.name));
+  const items = all.filter((i) => !EXCLUDES.some(([owner, hit]) => names.has(owner) && hit(i.name)));
   // 大小三元/四喜與字一色同時存在時直接累加 (網站規則未排除)
   const tai = items.reduce((s, i) => s + i.tai, 0);
   return { tai, items };
