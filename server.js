@@ -1431,6 +1431,14 @@ wss.on('connection', (ws) => {
         if (text) { room.chat.push({ from: room.seats[seat].name, text }); room.broadcast(); }
         break;
       }
+      case 'recommend': {
+        if (room.phase !== 'discard' || room.turn !== seat) break;
+        const allowed = [...new Set(room.allowedDiscards(seat))];
+        const s = room.seats[seat];
+        const tile = s.migi ? s.drawn : AI.chooseDiscard(room, seat, allowed).tile;
+        if (tile != null) send(ws, { type: 'recommend', tile });
+        break;
+      }
       case 'addbot': if (seat === room.host()) room.addBot(); break;
       case 'removebot': if (seat === room.host()) room.removeSeat(Number(msg.seat)); break;
       case 'start': if (seat === room.host()) room.startGame(); break;

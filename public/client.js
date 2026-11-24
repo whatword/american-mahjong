@@ -117,6 +117,12 @@ function connect(name, email) {
     else if (m.type === 'state') { S = m; render(); }
     else if (m.type === 'toast') toast(m.text);
     else if (m.type === 'say') showSay(m);
+    else if (m.type === 'recommend') {
+      if (!S || S.phase !== 'discard' || S.turn !== S.you) return;
+      const k = S.hand.indexOf(m.tile);
+      selected = S.drawn === m.tile ? 'drawn' : k >= 0 ? k : null;
+      renderGame();
+    }
     else if (m.type === 'habitFile') downloadFile(m);
     else if (m.type === 'kicked') kicked = true;
   };
@@ -770,6 +776,7 @@ function renderActionsInto(box) {
     const a = S.actions;
     // 可以自摸時，只顯示自摸按鈕 (不顯示 MIGI、暗槓、加槓)
     if (a.hu) { btn('自摸', 'hu', () => send({ type: 'hu' })); return; }
+    btn('電腦推薦', '', () => send({ type: 'recommend' }));
     if (a.locked) {
       box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中：點兩下摸進的牌打出' }));
       return;
@@ -783,9 +790,9 @@ function renderActionsInto(box) {
     }
     a.angang.forEach((t) => btn(`暗槓 ${tileName(t)}`, '', () => send({ type: 'angang', tile: t })));
     a.jiagang.forEach((t) => btn(`加槓 ${tileName(t)}`, '', () => send({ type: 'jiagang', tile: t })));
-    if (!box.children.length) {
+    if (box.children.length === 1) {
       const tingTip = S.ting && S.ting.byDiscard ? '・▲ 打出就聽牌，點選看聽什麼' : '';
-      box.innerHTML = `<span class="hint">點兩下打出${tingTip}</span>`;
+      box.insertAdjacentHTML('beforeend', `<span class="hint">點兩下打出${tingTip}</span>`);
     }
   } else if (S.phase === 'claim' && S.claim && !S.claim.resp) {
     const o = S.claim.opts;
