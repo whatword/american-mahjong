@@ -113,7 +113,11 @@ function connect(name, email) {
       $('loginBtn').disabled = false;
       ws.onclose = null;
       ws.close();
-    } else if (m.type === 'hall') { S = null; hall = m; renderHall(); }
+    } else if (m.type === 'hall') {
+      const fromGame = !!S;
+      S = null; hall = m; renderHall();
+      if (fromGame && hallTab === 'me') send({ type: 'habitRadar' });
+    }
     else if (m.type === 'state') { S = m; render(); }
     else if (m.type === 'toast') toast(m.text);
     else if (m.type === 'say') showSay(m);
@@ -124,6 +128,7 @@ function connect(name, email) {
       renderGame();
     }
     else if (m.type === 'habitFile') downloadFile(m);
+    else if (m.type === 'habitRadar') renderRadar(m.data);
     else if (m.type === 'kicked') kicked = true;
   };
   ws.onclose = () => {
@@ -256,6 +261,75 @@ function setHallTab(t) {
   $('mePane').classList.toggle('hidden', t !== 'me');
   $('tabBoard').classList.toggle('active', t === 'board');
   $('tabMe').classList.toggle('active', t === 'me');
+  if (t === 'me') send({ type: 'habitRadar' });
+}
+
+// 打牌習慣六角雷達圖 (Chart.js 從 CDN 載入，載入失敗就不顯示圖)
+let radarChart = null;
+function renderRadar(data) {
+  const empty = $('radarEmpty');
+  const canvas = $('habitRadar');
+  if (radarChart) { radarChart.destroy(); radarChart = null; }
+  canvas.classList.toggle('hidden', !data);
+  empty.classList.toggle('hidden', !!data);
+  if (!data || typeof Chart === 'undefined') return;
+  const luck = data.values[5];
+  const labels = data.labels.map((l, i) => (i === 5 ? `${l} (${luck >= 50 ? '順風' : '逆風'})` : l));
+  radarChart = new Chart(canvas.getContext('2d'), {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '目前表現',
+          data: data.values,
+          backgroundColor: 'rgba(56, 189, 248, 0.28)',
+          borderColor: '#38bdf8',
+          borderWidth: 2.5,
+          pointBackgroundColor: data.values.map((v, i) => (i === 5 && v < 50 ? '#f87171' : '#38bdf8')),
+          pointBorderColor: '#fff',
+          pointRadius: 4,
+          order: 1,
+        },
+        {
+          label: '50 分基準線',
+          data: [50, 50, 50, 50, 50, 50],
+          fill: false,
+          backgroundColor: 'transparent',
+          borderColor: '#fbbf24',
+          borderWidth: 2,
+          borderDash: [6, 5],
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          order: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: { stepSize: 25, color: '#94a3b8', backdropColor: 'transparent', font: { size: 11 } },
+          grid: { color: 'rgba(148, 163, 184, 0.25)' },
+          angleLines: { color: 'rgba(148, 163, 184, 0.3)' },
+          pointLabels: { color: '#f1f5f9', font: { size: 13, weight: 'bold' } },
+        },
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#cbd5e1', padding: 16, usePointStyle: true } },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              if (ctx.datasetIndex === 1) return ' 基準線: 50 分';
+              const diff = ctx.raw - 50;
+              return ` ${ctx.dataset.label}: ${ctx.raw} 分 (相對基準 ${diff >= 0 ? '+' : ''}${diff})`;
+            },
+          },
+        },
+      },
+    },
+  });
 }
 $('tabBoard').onclick = () => setHallTab('board');
 $('tabMe').onclick = () => setHallTab('me');

@@ -171,6 +171,36 @@ function build(email, name) {
   };
 }
 
+// 六角雷達圖：把統計摘要換算成六個 0~100 的分數。沒有任何完整牌局時回傳 null
+const RADAR_LABELS = ['牌理技巧', '進攻火力', '防守意識', '做大牌力', '鳴牌紀律', '近期牌運'];
+function radar(email) {
+  const events = load(email);
+  const hands = groupByHand(events);
+  const s = summarize(events);
+  if (!s.hands) return null;
+  const d = s.discard, t = s.ting, c = s.claim;
+  const n = (v, dflt = 0) => (typeof v === 'number' && isFinite(v) ? v : dflt);
+  const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
+
+  let startSum = 0, startN = 0;
+  for (const h of hands) {
+    if (!h.events.some((e) => e.k === 'end')) continue;
+    const first = h.events.find((e) => e.k === 'discard');
+    if (first && first.chosen) { startSum += first.chosen.sh; startN++; }
+  }
+  const avgStartSh = startN ? startSum / startN : 2.8;
+
+  const skill = clamp(n(d.sameAsComputerPct) * 1.15 - n(d.worseShantenPct) * 3 - (d.sameShantenLessUk / Math.max(1, d.total)) * 40);
+  const offense = clamp(n(t.handsPct) * 0.7 + n(s.winPct) * 1.2 + (10 - n(t.avgFirstTingTurn, 10)) * 4);
+  const defense = clamp(100 - n(s.dealInPct) * 2 - n(d.riskyInDefensePct) * 0.4 - (t.dealInsWhenNotTing / Math.max(1, s.dealIns)) * 20);
+  const power = clamp(n(s.avgWinTai) * 11 + (s.closedWins / Math.max(1, s.wins)) * 15 + (s.selfDraws / Math.max(1, s.wins)) * 10);
+  const divergence = (c.calledButComputerPassed + c.passedButComputerCalled) / Math.max(1, c.total);
+  const discipline = clamp(95 - (c.passedHu / Math.max(1, c.huOpportunities)) * 40 - divergence * 80 - (d.timeouts + c.timeouts) * 10);
+  const luck = clamp(50 + (s.selfDraws - s.zimoLosses) * 8 + (0.5 - s.otherWins / Math.max(1, s.hands)) * 30 + (2.8 - avgStartSh) * 15);
+
+  return { labels: RADAR_LABELS, values: [skill, offense, defense, power, discipline, luck], hands: s.hands };
+}
+
 function exportJson(email, name) {
   return JSON.stringify(build(email, name), null, 1);
 }
@@ -256,4 +286,4 @@ function exportMarkdown(email, name) {
   return L.join('\n');
 }
 
-module.exports = { MAX_HANDS, log, load, clear, summarize, exportJson, exportMarkdown, groupByHand, DIR };
+module.exports = { MAX_HANDS, log, load, clear, summarize, radar, exportJson, exportMarkdown, groupByHand, DIR };

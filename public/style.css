@@ -2582,3 +2582,8 @@ button.danger {
 @media (prefers-reduced-motion: reduce) {
   .fx-rays { animation: none; }
 }
+
+.radarbox {
+  max-width: 420px;
+  margin: 8px auto 4px;
+}

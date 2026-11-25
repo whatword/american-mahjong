@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>美國麻將・連線版</title>
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4" defer></script>
 </head>
 <body>
 <div id="login" class="panel">
@@ -45,6 +46,10 @@
       <div id="meStats"></div>
       <h3>📈 打牌習慣</h3>
       <p class="hint">系統會記錄你親自操作的每一次打牌、吃碰槓與過水（電腦代打不算），只保留最新 20 局。下載「AI 分析檔」和「原始資料」後，一起提供給 ChatGPT、Claude 等 AI，就會得到打牌建議、做得好與要改善的地方。</p>
+      <div id="radarBox" class="radarbox">
+        <canvas id="habitRadar"></canvas>
+        <p id="radarEmpty" class="hint hidden">還沒有完整的打牌紀錄，打完一局後就會顯示雷達圖。</p>
+      </div>
       <div class="row habitbar">
         <button id="habitMd" type="button">⬇ 下載 AI 分析檔 (.md)</button>
         <button id="habitJson" type="button" class="ghost">下載原始資料 (.json)</button>

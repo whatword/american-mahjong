@@ -1364,8 +1364,15 @@ wss.on('connection', (ws) => {
       return send(ws, { type: 'habitFile', fmt, filename: `mahjong-habits-${date}.${fmt}`, content });
     }
 
+    if (msg.type === 'habitRadar') {
+      let data = null;
+      try { data = Habits.radar(ws.user.email); } catch (e) { console.error('雷達圖計算失敗', e.message); }
+      return send(ws, { type: 'habitRadar', data });
+    }
+
     if (msg.type === 'habitClear') {
       Habits.clear(ws.user.email);
+      send(ws, { type: 'habitRadar', data: null });
       return send(ws, { type: 'toast', text: '已清除你的打牌紀錄' });
     }
 
