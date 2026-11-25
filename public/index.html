@@ -36,6 +36,8 @@
     <div class="tabs" role="tablist">
       <button id="tabBoard" type="button" class="tab active" role="tab">🏆 計分板</button>
       <button id="tabMe" type="button" class="tab" role="tab">👤 個人化</button>
+      <button id="tabAch" type="button" class="tab" role="tab">🏅 成就</button>
+      <button id="tabCol" type="button" class="tab" role="tab">🀄 收藏</button>
     </div>
     <div id="boardPane">
       <p class="hint">依累計金額排名（所有房間、所有局數的輸贏總和）。點選玩家或電腦查看戰績。</p>
@@ -55,9 +57,14 @@
         <button id="habitJson" type="button" class="ghost">下載原始資料 (.json)</button>
         <button id="habitClear" type="button" class="ghost danger">🗑 清除紀錄</button>
       </div>
-      <h3>🏅 成就</h3>
+    </div>
+    <div id="achPane" class="hidden">
       <p class="hint">用各種牌型胡牌就能解鎖，依台數多寡排列。</p>
       <div id="achList"></div>
+    </div>
+    <div id="colPane" class="hidden">
+      <p class="hint">用哪一張牌胡牌，就會收藏那張牌（不含花牌）。自摸、放槍胡都算，點亮的牌右下角是胡過的次數。</p>
+      <div id="colList"></div>
     </div>
   </div>
 </div>

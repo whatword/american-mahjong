@@ -978,11 +978,15 @@ button.small {
   color: #0b2a1c;
 }
 
-#mePane h3 {
+#mePane h3,
+#achPane h3,
+#colPane h3 {
   margin: 18px 0 4px;
 }
 
-#mePane h4 {
+#mePane h4,
+#achPane h4,
+#colPane h4 {
   margin: 14px 0 6px;
   color: #9c9;
 }
@@ -1026,6 +1030,44 @@ button.small {
 .ach .acnt {
   color: #9c9;
   font-size: 13px;
+}
+
+/* 收藏頁面：牌格 */
+.colgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.colcell {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 8px 4px;
+  background: #0a2a1c;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 40px;
+}
+
+.colcell.done {
+  border-color: #f4c542;
+}
+
+.colcell.todo .tile {
+  filter: grayscale(1) brightness(.45);
+}
+
+.colcell .colcnt {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #f4c542;
+  background: #000a;
+  border-radius: 6px;
+  padding: 0 4px;
 }
 
 .em {

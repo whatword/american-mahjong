@@ -259,8 +259,12 @@ function setHallTab(t) {
   hallTab = t;
   $('boardPane').classList.toggle('hidden', t !== 'board');
   $('mePane').classList.toggle('hidden', t !== 'me');
+  $('achPane').classList.toggle('hidden', t !== 'ach');
+  $('colPane').classList.toggle('hidden', t !== 'col');
   $('tabBoard').classList.toggle('active', t === 'board');
   $('tabMe').classList.toggle('active', t === 'me');
+  $('tabAch').classList.toggle('active', t === 'ach');
+  $('tabCol').classList.toggle('active', t === 'col');
   if (t === 'me') send({ type: 'habitRadar' });
 }
 
@@ -333,6 +337,8 @@ function renderRadar(data) {
 }
 $('tabBoard').onclick = () => setHallTab('board');
 $('tabMe').onclick = () => setHallTab('me');
+$('tabAch').onclick = () => setHallTab('ach');
+$('tabCol').onclick = () => setHallTab('col');
 
 // 打牌習慣：向伺服器要檔案，收到後用 Blob 觸發瀏覽器下載
 $('habitMd').onclick = () => send({ type: 'habitExport', fmt: 'md' });
@@ -362,7 +368,7 @@ function downloadFile({ filename, content, fmt }) {
 function renderMe(list, achievements) {
   const empty = {
     money: 0, moneyVsHuman: 0, moneyVsBot: 0, moneyLegacy: 0, hands: 0, wins: 0, selfDraws: 0, dealIns: 0, winRate: null,
-    vsHuman: { w: 0, l: 0, rate: null }, vsBot: { w: 0, l: 0, rate: null }, ach: {},
+    vsHuman: { w: 0, l: 0, rate: null }, vsBot: { w: 0, l: 0, rate: null }, ach: {}, tiles: {},
   };
   const p = list.find((x) => x.you) || empty;
   $('meStats').innerHTML = statGridHtml(p);
@@ -372,6 +378,30 @@ function renderMe(list, achievements) {
   $('achList').innerHTML =
     `<h4>已完成 ${done.length} / ${achievements.length}</h4><div class="achgrid">${done.map((a) => item(a, p.ach[a.name])).join('') || '<p class="hint">還沒有完成的成就。</p>'}</div>` +
     `<h4>未完成 ${todo.length}</h4><div class="achgrid">${todo.map((a) => item(a, 0)).join('') || '<p class="hint">全部完成了！🎉</p>'}</div>`;
+  renderCollection(p.tiles || {});
+}
+
+// 收藏：萬、筒、條各 9 張加上 7 種字牌 (不含花牌)，胡過的牌點亮並顯示次數
+function renderCollection(tiles) {
+  const groups = [['萬子', 0, 9], ['筒子', 9, 18], ['條子', 18, 27], ['字牌', 27, 34]];
+  const got = Array.from({ length: 34 }, (_, t) => t).filter((t) => tiles[t] > 0).length;
+  const box = $('colList');
+  box.innerHTML = `<h4>已收藏 ${got} / 34</h4>`;
+  for (const [title, a, b] of groups) {
+    const h = document.createElement('h4');
+    h.textContent = title;
+    const grid = document.createElement('div');
+    grid.className = 'colgrid';
+    for (let t = a; t < b; t++) {
+      const n = tiles[t] || 0;
+      const cell = document.createElement('div');
+      cell.className = 'colcell ' + (n ? 'done' : 'todo');
+      cell.appendChild(tileEl(t));
+      if (n) { const c = document.createElement('span'); c.className = 'colcnt'; c.textContent = '×' + n; cell.appendChild(c); }
+      grid.appendChild(cell);
+    }
+    box.append(h, grid);
+  }
 }
 $('leaveBtn').onclick = async () => {
   const yes = await confirmDialog({

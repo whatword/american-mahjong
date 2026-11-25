@@ -104,6 +104,11 @@ function recordHand(seats, result) {
       const got = new Set();
       for (const it of result.items || []) { const a = achName(it.name); if (a) got.add(a); }
       for (const a of got) we.ach[a] = (we.ach[a] || 0) + 1;
+      // 收藏：胡的那張牌 (萬筒條字，0-33；花牌不收，八仙過海／七搶一沒有胡牌的那張)
+      if (Number.isInteger(result.tile) && result.tile >= 0 && result.tile < 34) {
+        if (!we.tiles) we.tiles = {};
+        we.tiles[result.tile] = (we.tiles[result.tile] || 0) + 1;
+      }
     }
     for (let p = 0; p < 4; p++) {
       if (es[p]) es[p].money += delta[p] || 0;
@@ -140,6 +145,7 @@ function board(myEmail) {
     selfDraws: e.selfDraws,
     dealIns: e.dealIns,
     ach: e.ach || {},
+    tiles: e.tiles || {},
     winRate: rate(e.wins, e.hands),
     vsHuman: { ...e.vsHuman, rate: rate(e.vsHuman.w, e.vsHuman.w + e.vsHuman.l) },
     vsBot: { ...e.vsBot, rate: rate(e.vsBot.w, e.vsBot.w + e.vsBot.l) },
