@@ -1228,9 +1228,11 @@ class Room {
         hand.splice(hand.indexOf(me.drawn), 1);
         drawn = me.drawn;
       }
-      v.hand = sortTiles(hand);
-      v.myTaken = me.taken || [];
-      v.swapIn = me.swapIn || [];
+      // 換牌取牌中：取到的牌直接顯示在手牌並標示「換」，不必等其他玩家
+      const taken = this.phase === 'swapPick' && me.taken ? me.taken : [];
+      v.hand = sortTiles([...hand, ...taken]);
+      v.myTaken = [];
+      v.swapIn = taken.length ? taken.slice() : me.swapIn || [];
       v.myCover = me.cover ? me.cover.filter((t) => t !== null) : [];
       v.drawn = drawn;
       if (this.phase === 'discard' && this.turn === i) v.actions = this.selfActions(i);
