@@ -978,11 +978,7 @@ function renderActionsInto(box) {
     round('吃', 'chi', chi.length > 0, choose('chi', chi.length, () => done({ type: 'chi', tiles: chi[0] })));
     round('碰', 'pong', !!o.pong, () => done({ type: 'pong' }));
     round('槓', 'kong', !!o.kong, () => done({ type: 'kong' }));
-    round('胡', 'hu', !!o.hu, () => done({ type: 'hu' }));
-    round('過', 'pass', !o.forced, () => done({ type: 'pass' }));
-    box.appendChild(row);
-    if (o.forced) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中必須胡牌' }));
-    // 選擇框：吃有多種組合時，讓玩家挑一組 (被吃的牌放中間)
+    // 點吃後，選擇框取代「胡」的位置：吃 碰 槓 [選擇框] 過
     if (claimPick === 'chi' && chi.length > 1) {
       const pick = document.createElement('div');
       pick.className = 'claimpick';
@@ -994,8 +990,13 @@ function renderActionsInto(box) {
         d.onclick = () => done({ type: 'chi', tiles: p });
         pick.appendChild(d);
       });
-      box.appendChild(pick);
+      row.appendChild(pick);
+    } else {
+      round('胡', 'hu', !!o.hu, () => done({ type: 'hu' }));
     }
+    round('過', 'pass', !o.forced, () => done({ type: 'pass' }));
+    box.appendChild(row);
+    if (o.forced) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中必須胡牌' }));
   } else if (S.phase === 'claim' && S.claim && S.claim.resp) {
     box.innerHTML = '<span class="hint">已選擇，等待其他玩家…</span>';
   }
