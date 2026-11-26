@@ -2633,3 +2633,149 @@ button.danger {
 .auto-toggle { font-size: 12px; padding: 1px 8px; margin: 0 6px; border-radius: 10px; border: 1px solid #64748b; background: transparent; color: #cbd5e1; cursor: pointer; }
 .auto-toggle.on { background: #f59e0b; border-color: #f59e0b; color: #1f2937; font-weight: 600; }
 .auto-toggle:disabled { cursor: default; }
+
+/* 吃碰槓胡過：圓形按鈕。不能做的灰掉，能做的亮起來，「過」永遠醒目 */
+#actions .claimbtns {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+#actions button.rbtn {
+  width: 1em;
+  height: 1em;
+  box-sizing: content-box;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 40px;
+  line-height: 1em;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #3a3f47;
+  color: #8b929c;
+  border: 3px solid #555b64;
+  opacity: .6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+#actions button.rbtn.ready {
+  opacity: 1;
+  cursor: pointer;
+  background: #f4c542;
+  color: #222;
+  border-color: #fff3c4;
+  box-shadow: 0 0 .5em #f4c542aa;
+}
+
+#actions button.rbtn.ready:hover,
+#actions button.rbtn.active {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 3px #fff, 0 0 .7em #f4c542;
+}
+
+#actions button.rbtn.hu.ready {
+  background: #e74c3c;
+  color: #fff;
+  border-color: #ffd0cb;
+  box-shadow: 0 0 .5em #e74c3caa;
+}
+
+/* 過：紅色粗框，永遠比其他按鈕明顯 */
+#actions button.rbtn.pass {
+  opacity: 1;
+  background: #fff;
+  color: #d92d20;
+  border: 5px solid #d92d20;
+  box-shadow: 0 0 .6em #d92d20aa;
+}
+
+#actions button.rbtn.pass:disabled {
+  opacity: .45;
+  box-shadow: none;
+}
+
+#actions button.rbtn.pass:not(:disabled):hover {
+  background: #d92d20;
+  color: #fff;
+}
+
+#actions .claimpick {
+  display: flex;
+  gap: 12px;
+  margin-left: 6px;
+  padding: 8px 12px;
+  background: #000a;
+  border: 2px solid #f4c542;
+  border-radius: 12px;
+}
+
+@media (max-width: 900px) {
+  #actions .claimbtns { gap: 8px; }
+  #actions button.rbtn { font-size: 26px; }
+  #actions button.rbtn.pass { border-width: 4px; }
+}
+
+/* ---------- 圓角方形按鈕 + 不被浮起的手牌蓋住 ---------- */
+#actions button.rbtn {
+  border-radius: 22%;
+}
+
+#actions {
+  position: relative;
+  z-index: 6;
+}
+
+/* 吃碰槓時相關手牌會浮起，按鈕列往上讓出空間 */
+#actions:has(.claimbtns) {
+  margin-bottom: min(32px, 4.5vh);
+}
+
+/* ---------- 聽牌小燈泡 (在名稱下方) ---------- */
+.myname {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-right: 10px;
+}
+
+.ting-lamp {
+  padding: 0 6px;
+  font-size: 18px;
+  line-height: 1.3;
+  background: #2a2f36;
+  border: 1px solid #555b64;
+  border-radius: 8px;
+  filter: grayscale(1) brightness(.6);
+  cursor: default;
+}
+
+.ting-lamp.on {
+  filter: none;
+  cursor: pointer;
+  background: #f4c54233;
+  border-color: #f4c542;
+  box-shadow: 0 0 10px 2px #f4c542aa;
+}
+
+#me {
+  position: relative;
+}
+
+/* 點燈泡後，提醒內容浮在手牌區上方 */
+#tingBar {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: calc(100vw - 16px);
+}
+
+#tingBar .ting {
+  background: #1e1230f2;
+  box-shadow: 0 6px 18px #000a;
+}

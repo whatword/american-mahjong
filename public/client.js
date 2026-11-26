@@ -692,8 +692,12 @@ function renderGame() {
   const myTurn = S.phase === 'discard' && S.turn === me && !isSpectator;
   const mm = document.createElement('div');
   const viewingBadge = isSpectator ? '<span class="tag viewing-tag">當前視角</span>' : '';
-  mm.innerHTML = `<span style="margin-right:10px">${wind} ${S.seats[me].name}${viewingBadge}${me === S.dealer ? ' 莊' : ''}${me === S.dealer && S.streak ? ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` : ''} 💰${S.scores[me]}</span>` +
+  // 名稱下方放聽牌小燈泡 (亮起時點一下看聽牌內容)
+  const lamp = !isSpectator && S.ting ? '<button type="button" id="tingLamp" class="ting-lamp" title="聽牌提醒" aria-label="聽牌提醒">💡</button>' : '';
+  mm.innerHTML = `<span class="myname"><span>${wind} ${S.seats[me].name}${viewingBadge}${me === S.dealer ? ' 莊' : ''}${me === S.dealer && S.streak ? ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` : ''} 💰${S.scores[me]}</span>${lamp}</span>` +
     (S.seats[me].migi ? '<span class="migi-badge">MIGI</span>' : '');
+  const lampEl = mm.querySelector('#tingLamp');
+  if (lampEl) lampEl.onclick = (ev) => { ev.stopPropagation(); tingOpen = !tingOpen; renderGame(); };
   if (!isSpectator && !S.seats[me].bot) {
     const tg = document.createElement('button');
     const on = !!S.seats[me].auto;
@@ -721,8 +725,11 @@ function renderGame() {
   const handEl = $('myHand');
   handEl.className = 'row' + (myTurn || swapMode ? '' : ' disabled') + (isSpectator ? ' spectator-hand' : '');
   const hand = document.createElement('div');
+  const related = isSpectator ? null : claimRelated();
+  if (S.phase !== 'claim') claimPick = null;
   const addTile = (t, cls, idx) => {
     const e = tileEl(t, cls);
+    if (related && related.has(t)) e.classList.add('sel');
     if (!isSpectator) {
       // 選取中的牌：上浮、黃框發光，上方標示下一步要做什麼
       const tag = (text) => e.appendChild(Object.assign(document.createElement('span'), { className: 'seltag', textContent: text }));
@@ -770,11 +777,25 @@ function renderGame() {
 }
 
 // 聽牌提示：聽哪些牌、各剩幾張 (只扣掉自己看得到的牌)
+let tingOpen = false;
+document.addEventListener('click', (ev) => {
+  if (tingOpen && !ev.target.closest('#tingBar')) { tingOpen = false; if (S) renderGame(); }
+});
 function renderTing(myTurn) {
   const bar = $('tingBar');
-  bar.innerHTML = '';
+  const full = document.createElement('div');
   const t = S.ting;
-  if (!t) return;
+  // 內容先畫到暫存容器，有內容燈泡就亮，點燈泡才顯示在 #tingBar
+  const finish = () => {
+    const lit = full.childNodes.length > 0;
+    const lamp = $('tingLamp');
+    if (lamp) lamp.classList.toggle('on', lit);
+    if (!lit) tingOpen = false;
+    // 選了一張打出後會聽牌的牌：直接顯示；已經聽牌時則要點燈泡才展開
+    bar.replaceChildren(...((tingOpen || auto) && lit ? [...full.childNodes] : []));
+  };
+  let auto = false;
+  if (!t) return finish();
   const show = (label, waits) => {
     const total = waits.reduce((n, w) => n + w.left, 0);
     const d = document.createElement('div');
@@ -795,23 +816,25 @@ function renderTing(myTurn) {
     sum.className = 'tsum';
     sum.textContent = (total ? `共 ${total} 張` : '已無牌可胡') + (t.mult > 1 ? `・骰規豹子 (底+台)×${t.mult}` : '');
     d.appendChild(sum);
-    bar.appendChild(d);
+    full.appendChild(d);
   };
   if (t.waits) {
     show(t.noRon ? '聽牌 (過水中，暫時不能胡)：' : '聽牌：', t.waits);
-    if (t.noRon) bar.firstChild.classList.add('noron');
-    return;
+    if (t.noRon) full.firstChild.classList.add('noron');
+    return finish();
   }
-  if (!myTurn || !t.byDiscard) return;
+  if (!myTurn || !t.byDiscard) return finish();
   const selTile = selected === 'drawn' ? S.drawn : selected != null ? S.hand[selected] : null;
   if (selTile != null && t.byDiscard[selTile]) {
     // 過水中：打出的牌如果是自己聽的牌，打完還在過水
+    auto = true;
     const stillNoRon = t.noRon && t.byDiscard[selTile].some((w) => w.tile === selTile);
     show(`打出「${tileName(selTile)}」聽${t.noRon ? (stillNoRon ? '（打這張仍在過水中）' : '（打這張可解除過水）') : ''}：`, t.byDiscard[selTile]);
-    if (stillNoRon) bar.firstChild.classList.add('noron');
-    return;
+    if (stillNoRon) full.firstChild.classList.add('noron');
+    return finish();
   }
-  // 沒選牌時不另外佔一行，▲ 的說明併到下方操作提示裡
+  // 沒選牌時不顯示內容 (燈泡不亮)，▲ 的說明併到下方操作提示裡
+  finish();
 }
 
 function btn(text, cls, fn) {
@@ -824,6 +847,17 @@ function btn(text, cls, fn) {
 }
 
 let actBox = null;
+// 目前展開選擇框的動作 (目前只有 'chi')
+let claimPick = null;
+
+// 有人打牌可以吃碰槓時，手牌中跟這些動作有關的牌 (用牌值表示)
+function claimRelated() {
+  if (!S || S.phase !== 'claim' || !S.claim || S.claim.resp || !S.last) return null;
+  const o = S.claim.opts, lt = S.last.tile, set = new Set();
+  if (o.pong || o.kong) set.add(lt);
+  (o.chi || []).forEach((p) => p.forEach((t) => set.add(t)));
+  return set.size ? set : null;
+}
 // 先畫到暫存容器，內容沒變就保留舊按鈕，避免點擊途中按鈕被重建而失效
 function renderActions() {
   const real = $('actions');
@@ -921,24 +955,47 @@ function renderActionsInto(box) {
     }
   } else if (S.phase === 'claim' && S.claim && !S.claim.resp) {
     const o = S.claim.opts;
-    if (o.hu) btn('胡', 'hu', () => send({ type: 'hu' }));
-    const opt = (label, tiles, fn, mark) => {
-      const d = document.createElement('div');
-      d.className = 'chiopt';
-      const l = document.createElement('span');
-      l.textContent = label;
-      d.appendChild(l);
-      tiles.forEach((t, k) => d.appendChild(tileEl(t, 'sm' + (k === mark ? ' claimed' : ''))));
-      d.onclick = fn;
-      box.appendChild(d);
-    };
     const lt = S.last.tile;
-    if (o.kong) opt('槓', [lt, lt, lt, lt], () => send({ type: 'kong' }));
-    if (o.pong) opt('碰', [lt, lt, lt], () => send({ type: 'pong' }));
-    // 吃：被吃的牌放中間
-    o.chi.forEach((p) => { const [a, b] = p.slice().sort((x, y) => x - y); opt('吃', [a, lt, b], () => send({ type: 'chi', tiles: p }), 1); });
+    const chi = o.chi || [];
+    const done = (msg) => { claimPick = null; send(msg); };
+    // 五個圓形按鈕：可以做的亮起來，不能做的灰掉不能點
+    const row = document.createElement('div');
+    row.className = 'claimbtns';
+    const round = (label, cls, enabled, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rbtn ' + cls + (enabled ? ' ready' : '') + (claimPick === cls ? ' active' : '');
+      b.textContent = label;
+      b.disabled = !enabled;
+      if (enabled) b.onclick = fn;
+      row.appendChild(b);
+    };
+    // 只有一種選擇就直接執行，有多種 (例如吃 123 / 234) 才跳出選擇框
+    const choose = (kind, count, run) => () => {
+      if (count > 1) { claimPick = claimPick === kind ? null : kind; renderGame(); }
+      else run();
+    };
+    round('吃', 'chi', chi.length > 0, choose('chi', chi.length, () => done({ type: 'chi', tiles: chi[0] })));
+    round('碰', 'pong', !!o.pong, () => done({ type: 'pong' }));
+    round('槓', 'kong', !!o.kong, () => done({ type: 'kong' }));
+    round('胡', 'hu', !!o.hu, () => done({ type: 'hu' }));
+    round('過', 'pass', !o.forced, () => done({ type: 'pass' }));
+    box.appendChild(row);
     if (o.forced) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中必須胡牌' }));
-    else btn('過', '', () => send({ type: 'pass' }));
+    // 選擇框：吃有多種組合時，讓玩家挑一組 (被吃的牌放中間)
+    if (claimPick === 'chi' && chi.length > 1) {
+      const pick = document.createElement('div');
+      pick.className = 'claimpick';
+      chi.forEach((p) => {
+        const [a, b] = p.slice().sort((x, y) => x - y);
+        const d = document.createElement('div');
+        d.className = 'chiopt';
+        [a, lt, b].forEach((t, k) => d.appendChild(tileEl(t, 'sm' + (k === 1 ? ' claimed' : ''))));
+        d.onclick = () => done({ type: 'chi', tiles: p });
+        pick.appendChild(d);
+      });
+      box.appendChild(pick);
+    }
   } else if (S.phase === 'claim' && S.claim && S.claim.resp) {
     box.innerHTML = '<span class="hint">已選擇，等待其他玩家…</span>';
   }
