@@ -227,28 +227,38 @@ button:disabled {
   align-content: flex-start;
 }
 
+#center .pool,
 #center .pool .tile {
   font-size: 60px;
 }
 
 .pool.p0 {
+  min-height: 1.1em;
   grid-area: bottom;
   justify-content: center;
   align-content: flex-end;
 }
 
 .pool.p2 {
+  min-height: 1.1em;
   grid-area: top;
   justify-content: center;
 }
 
 .pool.p3 {
   grid-area: left;
+  /* 由上到下、由左到右 */
+  flex-direction: column;
+  flex-wrap: wrap;
+  contain: size;
 }
 
 .pool.p1 {
   grid-area: right;
-  justify-content: flex-end;
+  /* 由上到下、由右到左 */
+  flex-direction: column;
+  flex-wrap: wrap-reverse;
+  contain: size;
 }
 
 .back.pick {
@@ -1271,6 +1281,8 @@ button,
     gap: 4px;
   }
 
+
+  #center .pool,
   #center .pool .tile {
     font-size: clamp(20px, 3.8vw, 44px);
   }
@@ -1483,6 +1495,8 @@ button,
     overflow-wrap: anywhere;
   }
 
+
+  #center .pool,
   #center .pool .tile {
     font-size: 25px;
   }
@@ -1526,6 +1540,8 @@ button,
     margin: 0;
   }
 
+
+  #center .pool,
   #center .pool .tile {
     font-size: clamp(16px, 5.2vh, 30px);
   }
@@ -1717,6 +1733,7 @@ button,
   }
 
   /* 牌河、副露依螢幕高度縮小，矮螢幕也放得下 */
+  #center .pool,
   #center .pool .tile {
     font-size: min(60px, 6vh);
   }
