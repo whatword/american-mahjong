@@ -242,6 +242,17 @@ class Room {
     sp.owners[slot] = i;
     sp.picks[wind] = i;
     this.sys(`${this.seats[i].name} 選了「${['東', '南', '西', '北'][wind]}」`);
+    if (Object.keys(sp.picks).length === 3) {
+      // 只剩最後一張風牌：直接幫最後一位玩家選好
+      const last = [0, 1, 2, 3].find((p) => !sp.owners.includes(p));
+      const free = sp.owners.findIndex((o) => o === null);
+      if (last !== undefined && free >= 0) {
+        const w = sp.tiles[free];
+        sp.owners[free] = last;
+        sp.picks[w] = last;
+        this.sys(`${this.seats[last].name} 只剩最後一張，自動選了「${['東', '南', '西', '北'][w]}」`);
+      }
+    }
     if (Object.keys(sp.picks).length === 4) this.applySeats();
     else this.broadcast();
   }
