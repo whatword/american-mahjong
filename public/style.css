@@ -2779,3 +2779,47 @@ button.danger {
   background: #1e1230f2;
   box-shadow: 0 6px 18px #000a;
 }
+
+/* 手牌列最左邊的吃碰槓：跟手牌同大小，不能點、不受選牌變暗影響 */
+#myHand .meld-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 8px 4px;
+  border: 2px solid #f4c542;
+  border-radius: 8px;
+  background: #f4c54222;
+}
+
+#myHand .meld-label {
+  font-size: 12px;
+  line-height: 1.3;
+  color: #f4c542;
+  font-weight: bold;
+}
+
+#myHand .meld-list {
+  display: flex;
+  gap: 8px;
+}
+
+#myHand .meld {
+  margin: 0;
+  gap: 1px;
+}
+
+/* 吃碰槓與手牌之間的分隔線 */
+#myHand .zone-divider {
+  align-self: stretch;
+  width: 3px;
+  margin: 0 8px;
+  border-radius: 2px;
+  background: #f4c542;
+  opacity: .7;
+}
+
+#myHand .meld .tile:not(.sel) {
+  cursor: default;
+  filter: none;
+  opacity: 1;
+}

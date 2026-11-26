@@ -708,7 +708,6 @@ function renderGame() {
     tg.onclick = () => send({ type: 'auto', on: !on });
     mm.insertBefore(tg, mm.firstChild.nextSibling);
   }
-  S.seats[me].melds.forEach((m) => mm.appendChild(meldEl(m)));
   if (S.myTaken && S.myTaken.length) {
     const tk = document.createElement('span');
     tk.style.cssText = 'display:flex;gap:2px;margin-left:10px;align-items:center';
@@ -762,6 +761,23 @@ function renderGame() {
   const swapLeft = {};
   for (const t of S.swapIn || []) swapLeft[t] = (swapLeft[t] || 0) + 1;
   const swapped = (t) => (swapLeft[t] > 0 ? (swapLeft[t]--, ' swapin') : '');
+  // 吃碰槓的牌依發生順序翻開，排在手牌最左邊
+  if (S.seats[me].melds.length) {
+    const zone = document.createElement('div');
+    zone.className = 'meld-zone';
+    const lb = document.createElement('span');
+    lb.className = 'meld-label';
+    lb.textContent = '吃碰槓';
+    zone.appendChild(lb);
+    const ms = document.createElement('div');
+    ms.className = 'meld-list';
+    S.seats[me].melds.forEach((m) => ms.appendChild(meldEl(m)));
+    zone.appendChild(ms);
+    hand.appendChild(zone);
+    const dv = document.createElement('div');
+    dv.className = 'zone-divider';
+    hand.appendChild(dv);
+  }
   (S.hand || []).forEach((t, k) => addTile(t, tingable(t) + locked + swapped(t) + (forbid.has(t) ? ' forbid' : ''), k));
   if (S.drawn != null) addTile(S.drawn, 'drawn' + tingable(S.drawn) + swapped(S.drawn), 'drawn');
   patchChildren(handEl, [...hand.childNodes]);
@@ -976,9 +992,7 @@ function renderActionsInto(box) {
       else run();
     };
     round('吃', 'chi', chi.length > 0, choose('chi', chi.length, () => done({ type: 'chi', tiles: chi[0] })));
-    round('碰', 'pong', !!o.pong, () => done({ type: 'pong' }));
-    round('槓', 'kong', !!o.kong, () => done({ type: 'kong' }));
-    // 點吃後，選擇框取代「胡」的位置：吃 碰 槓 [選擇框] 過
+    // 點吃後，選擇框取代碰、槓、胡：吃 [選擇框] 過。再點一次吃就回復原狀
     if (claimPick === 'chi' && chi.length > 1) {
       const pick = document.createElement('div');
       pick.className = 'claimpick';
@@ -992,6 +1006,8 @@ function renderActionsInto(box) {
       });
       row.appendChild(pick);
     } else {
+      round('碰', 'pong', !!o.pong, () => done({ type: 'pong' }));
+      round('槓', 'kong', !!o.kong, () => done({ type: 'kong' }));
       round('胡', 'hu', !!o.hu, () => done({ type: 'hu' }));
     }
     round('過', 'pass', !o.forced, () => done({ type: 'pass' }));
