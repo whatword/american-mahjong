@@ -2629,3 +2629,7 @@ button.danger {
   max-width: 420px;
   margin: 8px auto 4px;
 }
+
+.auto-toggle { font-size: 12px; padding: 1px 8px; margin: 0 6px; border-radius: 10px; border: 1px solid #64748b; background: transparent; color: #cbd5e1; cursor: pointer; }
+.auto-toggle.on { background: #f59e0b; border-color: #f59e0b; color: #1f2937; font-weight: 600; }
+.auto-toggle:disabled { cursor: default; }

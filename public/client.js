@@ -599,6 +599,16 @@ function renderGame() {
       nm.append(`${wind} ${s.name}${s.online ? '' : '(離線)'}${i === S.dealer ? ' 莊' : ''}`);
       if (i === S.dealer && S.streak) nm.append(' ', Object.assign(document.createElement('b'), { className: 'streak', textContent: `🔥 連${S.streak}拉${S.streak}` }));
       if (s.migi) nm.appendChild(Object.assign(document.createElement('span'), { className: 'migi-badge', textContent: 'MIGI' }));
+      if (!s.bot && s.online) {
+        const mine = i === S.you && !isSpectator;
+        const tg = document.createElement('button');
+        tg.type = 'button';
+        tg.className = 'auto-toggle' + (s.auto ? ' on' : '');
+        tg.textContent = s.auto ? '代打中' : '代打';
+        if (mine) { tg.title = '開啟後所有決策由電腦自動完成'; tg.onclick = (e) => { e.stopPropagation(); send({ type: 'auto', on: !s.auto }); }; }
+        else { tg.disabled = true; if (!s.auto) tg.style.display = 'none'; }
+        nm.append(' ', tg);
+      }
       el.appendChild(nm);
       const sc = document.createElement('div');
       sc.textContent = `💰 ${S.scores[i]}`;
@@ -684,6 +694,16 @@ function renderGame() {
   const viewingBadge = isSpectator ? '<span class="tag viewing-tag">當前視角</span>' : '';
   mm.innerHTML = `<span style="margin-right:10px">${wind} ${S.seats[me].name}${viewingBadge}${me === S.dealer ? ' 莊' : ''}${me === S.dealer && S.streak ? ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` : ''} 💰${S.scores[me]}</span>` +
     (S.seats[me].migi ? '<span class="migi-badge">MIGI</span>' : '');
+  if (!isSpectator && !S.seats[me].bot) {
+    const tg = document.createElement('button');
+    const on = !!S.seats[me].auto;
+    tg.type = 'button';
+    tg.className = 'auto-toggle' + (on ? ' on' : '');
+    tg.textContent = on ? '🤖 代打中' : '🤖 代打';
+    tg.title = '開啟後所有決策由電腦自動完成';
+    tg.onclick = () => send({ type: 'auto', on: !on });
+    mm.insertBefore(tg, mm.firstChild.nextSibling);
+  }
   S.seats[me].melds.forEach((m) => mm.appendChild(meldEl(m)));
   if (S.myTaken && S.myTaken.length) {
     const tk = document.createElement('span');

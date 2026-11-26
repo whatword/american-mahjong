@@ -89,7 +89,7 @@ class Room {
   }
 
   // ----- 座位管理 -----
-  isAuto(i) { const s = this.seats[i]; return !!s && (s.bot || !s.ws); }
+  isAuto(i) { const s = this.seats[i]; return !!s && (s.bot || !s.ws || !!s.auto); }
   humanCount() { return this.seats.filter((s) => s && !s.bot && s.ws).length; }
   host() { return this.seats.findIndex((s) => s && !s.bot && s.ws); }
 
@@ -1202,7 +1202,7 @@ class Room {
       last: this.last, deadline: this.deadline, handNo: this.handNo, chat: this.chat.slice(-30),
       result: this.result, swapLeft: this.phase.startsWith('swap') ? MAX_SWAPS - this.swapsDone : 0, swapMax: MAX_SWAPS, base: BASE, taiValue: TAI_VALUE,
       seats: this.seats.map((s, k) => s && {
-        name: s.name, bot: s.bot, online: s.bot || !!s.ws,
+        name: s.name, bot: s.bot, auto: !!s.auto, online: s.bot || !!s.ws,
         migi: !!s.migi, confirmed: !!s.confirmed, cover: s.cover ? s.cover.map((t) => t !== null) : null,
         handCount: s.hand.length,
         // 暗槓牌面只給本人看；結算時才公開
@@ -1445,6 +1445,14 @@ wss.on('connection', (ws) => {
         const s = room.seats[seat];
         const tile = s.migi ? s.drawn : AI.chooseDiscard(room, seat, allowed).tile;
         if (tile != null) send(ws, { type: 'recommend', tile });
+        break;
+      }
+      case 'auto': {
+        const s = room.seats[seat];
+        if (!s || s.bot || room.state !== 'playing') break;
+        s.auto = !!msg.on;
+        room.broadcast();
+        if (s.auto) room.maybeAct();
         break;
       }
       case 'addbot': if (seat === room.host()) room.addBot(); break;
