@@ -638,19 +638,25 @@ function renderGame() {
     patchChildren($('pool' + k), [...pool.childNodes]);
   }
 
-  // 中央資訊
+  renderWalls(me);
+
+  // 中央資訊 + 電動麻將桌四方風位指示燈
   let info = '';
+  let showCompass = false;
   if (S.phase === 'lastDraw') {
+    showCompass = true;
     info = (S.turn === me && !isSpectator)
       ? '<div class="big">最後一張牌，你還沒聽牌</div><div>可以選擇不摸，直接流局</div>'
       : `<div>等待 ${S.seats[S.turn].name} 決定是否摸最後一張牌</div>`;
   } else if (S.phase === 'discard') {
+    showCompass = true;
     info = (S.turn === me && !isSpectator)
       ? '<div class="big">輪到你出牌</div>'
       : (S.turn === me && isSpectator)
         ? `<div class="big">輪到 ${S.seats[me].name} 出牌（當前視角）</div>`
         : `<div>等待 ${S.seats[S.turn].name} 出牌</div>`;
   } else if (S.phase === 'claim') {
+    showCompass = true;
     info = `<div>${S.seats[S.last.from].name} ${S.last.rob ? '加槓' : '打出'} <b>${tileName(S.last.tile)}</b></div>` +
       (S.last.rob ? '<div>可搶槓</div>' : '') +
       (S.waiting && S.waiting.length ? `<div>等待 ${S.waiting.map((p) => S.seats[p].name).join('、')}</div>` : '');
@@ -659,6 +665,7 @@ function renderGame() {
   } else if (S.phase === 'seatPick' && S.seatPick) {
     info = '';
   } else if (S.phase.startsWith('swap')) {
+    showCompass = true;
     const left = `<div>還可換 ${S.swapLeft} 次</div>`;
     const done = S.seats.filter((s) => s.confirmed).length;
     if (S.phase === 'swapAsk') {
@@ -674,8 +681,18 @@ function renderGame() {
     }
   }
   info += `<div class="timer" id="timer"></div>`;
-  $('info').innerHTML = info;
-  if (S.phase === 'seatPick' && S.seatPick) renderSeatPick($('info'));
+  if (showCompass) info += compassHtml(me, rel);
+  const infoEl = $('info');
+  const curDiceKey = (S.phase === 'dice' && S.dice && S.dice.values)
+    ? `${S.handNo}-${S.dice.stage}-${S.dice.rolledAt}`
+    : '';
+  infoEl.classList.toggle('has-compass', showCompass);
+  if (!curDiceKey || infoEl.dataset.diceKey !== curDiceKey) {
+    if (curDiceKey) infoEl.dataset.diceKey = curDiceKey;
+    else delete infoEl.dataset.diceKey;
+    infoEl.innerHTML = info;
+  }
+  if (S.phase === 'seatPick' && S.seatPick) renderSeatPick(infoEl);
 
   // 我的牌
   const wind = WINDS[(me - S.dealer + 4) % 4];
@@ -747,6 +764,38 @@ function renderGame() {
   renderChat();
   renderResult();
   startTimer();
+}
+
+// ---------- 牌牆 ----------
+// 144 張排成一圈，座位 s 的牆是 [s*36, s*36+36)，每墩 2 張。
+// 抓牌從開門處順著往前，補花與槓牌從尾端往回拿；所以圈上剩下的牌是
+// 從 (開門處 + 前面抓走的張數) 起連續 n 張。還沒開門 (擲骰、選位) 時整圈都在。
+const WALL_RING = 144;
+function renderWalls(me) {
+  const b = S.breakInfo;
+  const n = Math.max(0, Math.min(WALL_RING, S.wallRaw == null ? WALL_RING : S.wallRaw));
+  const back = S.wallBack || 0;
+  const first = b ? (b.owner * 36 + (b.stack - 1) * 2 + Math.max(0, WALL_RING - n - back)) % WALL_RING : 0;
+  const key = `${S.handNo}|${b ? `${b.owner}-${b.stack}` : ''}|${n}|${back}|${me}`;
+  for (let k = 0; k < 4; k++) {
+    const el = $('wall' + k);
+    if (!el) continue;
+    if (el.children.length !== 18) {
+      el.replaceChildren(...Array.from({ length: 18 }, () => Object.assign(document.createElement('i'), { className: 'st n2' })));
+      el.dataset.key = '';
+    }
+    if (el.dataset.key === key) continue;
+    el.dataset.key = key;
+    const seat = (me + k) % 4;
+    for (let j = 0; j < 18; j++) {
+      let cnt = 0;
+      for (let h = 0; h < 2; h++) {
+        const p = seat * 36 + j * 2 + h;
+        if (!b || (p - first + WALL_RING) % WALL_RING < n) cnt++;
+      }
+      el.children[j].className = 'st n' + cnt;
+    }
+  }
 }
 
 // 聽牌提示：聽哪些牌、各剩幾張 (只扣掉自己看得到的牌)
@@ -1030,24 +1079,75 @@ function toast(text) {
 
 const DICE_FACE = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 let diceAnimKey = '';
+let diceSpinInterval = null;
+
+function pipHtml(v) {
+  return '<i class="pip"></i>'.repeat(v);
+}
+function dieFaceHtml(v, cls = '') {
+  return `<span class="die d${v}${cls ? ' ' + cls : ''}" aria-label="${DICE_FACE[v - 1]}">${pipHtml(v)}</span>`;
+}
+
+// 動畫期間：JS 每 70ms 切換隨機點數，讓骰子看起來真的在滾
+function startDiceSpin(values) {
+  if (diceSpinInterval) { clearInterval(diceSpinInterval); diceSpinInterval = null; }
+  diceSpinInterval = setInterval(() => {
+    const els = document.querySelectorAll('.die[class*="rolling-"]');
+    if (!els.length) { clearInterval(diceSpinInterval); diceSpinInterval = null; return; }
+    els.forEach((el, i) => {
+      const r = 1 + Math.floor(Math.random() * 6);
+      el.className = `die d${r} rolling-${i}`;
+      el.innerHTML = pipHtml(r);
+    });
+  }, 70);
+  // 動畫結束後落定：顯示真實點數 + 彈跳
+  setTimeout(() => {
+    clearInterval(diceSpinInterval);
+    diceSpinInterval = null;
+    const els = document.querySelectorAll('.die[class*="rolling-"]');
+    if (!els.length) return;
+    els.forEach((el, i) => {
+      const v = values[i];
+      el.className = `die d${v} land`;
+      el.innerHTML = pipHtml(v);
+      setTimeout(() => { if (el.className.includes('land')) el.className = `die d${v}`; }, 230);
+    });
+  }, 950);
+}
+
+function compassHtml(me, rel) {
+  let h = '<div class="compass" aria-hidden="true">';
+  for (let k = 0; k < 4; k++) {
+    const i = rel(k);
+    const wind = WINDS[(i - S.dealer + 4) % 4];
+    const active = S.phase === 'claim'
+      ? (S.waiting ? S.waiting.includes(i) : S.last && S.last.from === i)
+      : S.turn === i;
+    const dealer = i === S.dealer;
+    h += `<span class="cw cw-${k}${active ? ' on' : ''}${dealer ? ' dealer' : ''}">${wind}</span>`;
+  }
+  return h + '</div>';
+}
 // 擲骰資訊：所有玩家都看得到骰子與結果
 function diceInfo() {
   const d = S.dice;
   const thrower = S.seats[d.thrower].name;
   const title = d.stage === 'dealer' ? '擲骰決定起莊' : `莊家 ${thrower} 擲骰開門`;
   if (!d.values) {
-    const wait = (d.thrower === S.you && !S.spectating) ? '<div class="big">請擲骰子</div>' : `<div>等待 ${thrower} 擲骰子…</div>`;
-    return `<div>${title}</div>${wait}<div class="dice">${'<span class="die idle">⚀</span>'.repeat(3)}</div>`;
+    return `<div>${title}</div><div>${(d.thrower === S.you && !S.spectating) ? '<div class="big">請擲骰子</div>' : `等待 ${thrower} 擲骰子…`}</div><div class="dice">${[1, 2, 3].map((v) => dieFaceHtml(v, 'idle')).join('')}</div>`;
   }
   const key = `${S.handNo}-${d.stage}-${d.rolledAt}`;
   const anim = key !== diceAnimKey && Date.now() - d.rolledAt < 1500;
   diceAnimKey = key;
-  const dice = d.values.map((v) => `<span class="die${anim ? ' roll' : ''}">${DICE_FACE[v - 1]}</span>`).join('');
+  const diceHtml = anim
+    ? d.values.map((v, idx) => dieFaceHtml(v, `rolling-${idx}`)).join('')
+    : d.values.map((v) => dieFaceHtml(v)).join('');
+  if (anim) setTimeout(() => startDiceSpin(d.values), 20);
   const target = S.seats[d.target].name;
   const res = d.stage === 'dealer'
     ? `由 <b>${target}</b> 起莊（東風）`
     : `從 <b>${target}</b> 的牌牆第 ${d.total + 1} 墩開門`;
-  return `<div>${title}</div><div class="dice">${dice}</div><div class="big">${d.total} 點</div><div>${res}</div>`;
+  return `<div>${title}</div><div class="dice">${diceHtml}</div><div class="dice-res${anim ? ' reveal' : ''}"><div class="big">${d.total} 點</div><div>${res}</div></div>`;
 }
 
 // 每將開始：海底擺東南西北，點選一張決定座位

@@ -336,6 +336,7 @@ class Room {
     const start = (owner * 36 + total * 2) % tiles.length;
     this.wall = tiles.slice(start).concat(tiles.slice(0, start)); // 前端順抓，尾端為補花/槓尾
     this.breakInfo = { owner, stack: total + 1 };
+    this.wallBack = 0; // 從牌尾 (補花、槓牌) 拿走的張數，畫面上畫牌牆用
     this.discardCount = 0; // 全桌已打出張數 (MIGI 判定用)
     this.discardLog = []; // 全桌出牌順序 (電腦判斷安全牌用，皆為公開資訊)
     this.called = false; // 是否有人吃/碰/槓過
@@ -473,6 +474,7 @@ class Room {
       if (fi < 0) break;
       s.flowers.push(s.hand.splice(fi, 1)[0]);
       s.hand.push(this.wall.pop());
+      this.wallBack = (this.wallBack || 0) + 1;
     }
   }
 
@@ -481,6 +483,7 @@ class Room {
     const s = this.seats[i];
     let t;
     do {
+      if (fromBack) this.wallBack = (this.wallBack || 0) + 1;
       t = fromBack ? this.wall.pop() : this.wall.shift();
       if (G.isFlower(t)) s.flowers.push(t);
       else break;
@@ -1188,6 +1191,7 @@ class Room {
       scores: this.scores, dealer: this.dealer, streak: this.streak, round: this.round,
       phase: this.phase, turn: this.turn, wall: this.wall ? Math.max(0, this.wall.length - DEAD_WALL) : 0,
       dice: this.dice || null, breakInfo: this.breakInfo || null,
+      wallRaw: this.wall ? this.wall.length : 0, wallBack: this.wallBack || 0, // 牌牆畫面用：牆上實際剩幾張、從尾端拿走幾張
       jiang: this.jiang,
       // 未翻開的風牌不送給前端，避免偷看
       seatPick: this.phase === 'seatPick' ? {

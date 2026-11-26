@@ -99,34 +99,55 @@ button:disabled {
   grid-template-columns: 1fr 260px;
   grid-template-rows: auto 1fr auto;
   height: 100vh;
+  background: radial-gradient(ellipse at 42% 45%, #123625 0%, #071c12 62%, #030d08 100%);
 }
 
 #topbar {
   grid-column: 1 / 3;
   padding: 6px 12px;
-  background: #083222;
+  background: linear-gradient(180deg, #1b1109 0%, #0e2419 100%);
+  border-bottom: 1px solid rgba(212, 168, 67, 0.25);
   display: flex;
   gap: 16px;
   align-items: center;
   font-size: 14px;
   flex-wrap: wrap;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  z-index: 2;
 }
 
 #table {
   grid-column: 1;
   display: grid;
-  grid-template-columns: 160px 1fr 160px;
+  grid-template-columns: 168px 1fr 168px;
   grid-template-rows: auto 1fr;
-  gap: 6px;
-  padding: 6px;
+  gap: 8px;
+  padding: 12px 14px 10px;
   min-height: 0;
+  margin: 8px 10px 0;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(255, 220, 140, 0.06) 0%, transparent 65%),
+    linear-gradient(155deg, #4b2a14 0%, #2f180a 48%, #211006 100%);
+  border: 2px solid #6f4121;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 160, 0.22),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.45),
+    inset 0 0 30px rgba(0, 0, 0, 0.65),
+    0 14px 36px rgba(0, 0, 0, 0.65);
+  perspective: 1200px;
+  perspective-origin: 50% 52%;
 }
 
 .seat {
-  background: #0a3a26;
-  border-radius: 8px;
-  padding: 6px;
+  background: linear-gradient(180deg, rgba(10, 44, 29, 0.88), rgba(6, 28, 18, 0.94));
+  border: 1px solid rgba(212, 168, 67, 0.24);
+  border-radius: 10px;
+  padding: 7px 8px;
   font-size: 13px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 10px rgba(0, 0, 0, 0.45);
 }
 
 .seat.top {
@@ -146,7 +167,11 @@ button:disabled {
 }
 
 .seat.turn {
-  outline: 3px solid #f4c542;
+  border-color: #f4c542;
+  outline: 2px solid #f4c542;
+  box-shadow:
+    0 0 18px rgba(244, 197, 66, 0.35),
+    inset 0 0 12px rgba(244, 197, 66, 0.14);
 }
 
 .seat .nm {
@@ -158,8 +183,8 @@ button:disabled {
 .seat .flw {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
-  margin-top: 4px;
+  gap: 5px 3px;
+  margin-top: 6px;
   justify-content: center;
 }
 
@@ -171,17 +196,26 @@ button:disabled {
 .backs {
   display: flex;
   flex-wrap: wrap;
-  gap: 1px;
+  gap: 7px 2px;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 8px;
+  padding: 7px 4px 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.48);
 }
 
 .back {
-  width: 10px;
-  height: 14px;
-  background: #2a7;
+  width: 12px;
+  height: 17px;
+  background: linear-gradient(180deg, #329962 0%, #207044 75%, #165130 100%);
   border-radius: 2px;
-  border: 1px solid #185;
+  border: 1px solid #164e2f;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 -2px 0 #ebe4d4,
+    0 -3.5px 0 #cfc5af,
+    0 3px 4px rgba(0, 0, 0, 0.55);
 }
 
 .seat.left .backs,
@@ -192,38 +226,96 @@ button:disabled {
 #center {
   grid-column: 2;
   grid-row: 2;
-  background: #0f5a3a;
-  border-radius: 10px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.025) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 42%, #17784b 0%, #0f5c38 56%, #083b23 100%);
+  border-radius: 12px;
+  border: 3px solid #6b3f1d;
+  box-shadow:
+    inset 0 10px 28px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 2px rgba(244, 197, 66, 0.16),
+    0 10px 24px rgba(0, 0, 0, 0.55);
   min-height: 420px;
-  padding: 8px;
+  padding: 12px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   grid-template-columns: 1fr auto 1fr;
   grid-template-rows: auto 1fr auto;
   grid-template-areas: "top top top" "left info right" "bottom bottom bottom";
+  transform: rotateX(8deg);
+  transform-origin: 50% 85%;
+  transform-style: preserve-3d;
 }
 
 #info {
+  position: relative;
   grid-area: info;
   align-self: center;
   text-align: center;
-  background: #0a3a26;
-  padding: 10px 16px;
-  border-radius: 10px;
+  background: radial-gradient(circle at 50% 35%, #153c2b 0%, #092117 75%, #05130d 100%);
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: 2px solid rgba(212, 168, 67, 0.45);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.6),
+    inset 0 2px 5px rgba(255, 255, 255, 0.1),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.6);
   font-size: 14px;
-  min-width: 150px;
+  min-width: 158px;
 }
+
+#info.has-compass {
+  padding: 22px 28px;
+}
+
+.compass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cw {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: rgba(180, 220, 195, 0.55);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.cw.dealer {
+  color: #ffd479;
+  border-color: rgba(244, 197, 66, 0.38);
+}
+
+.cw.on {
+  color: #2b1d00;
+  background: linear-gradient(180deg, #ffe580, #f4c542);
+  border-color: #fff3b0;
+  box-shadow: 0 0 12px rgba(244, 197, 66, 0.85);
+}
+
+.cw-0 { left: 50%; bottom: 4px; transform: translateX(-50%); }
+.cw-2 { left: 50%; top: 4px; transform: translateX(-50%); }
+.cw-1 { right: 4px; top: 50%; transform: translateY(-50%); }
+.cw-3 { left: 4px; top: 50%; transform: translateY(-50%); }
 
 #info .big {
   font-size: 22px;
   font-weight: bold;
   color: #f4c542;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 .pool {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 11px 5px;
   align-content: flex-start;
 }
 
@@ -235,6 +327,7 @@ button:disabled {
   grid-area: bottom;
   justify-content: center;
   align-content: flex-end;
+  padding-bottom: 4px;
 }
 
 .pool.p2 {
@@ -279,7 +372,18 @@ button:disabled {
 }
 
 .pool .tile.latest {
-  outline: 2px solid #f44;
+  box-shadow:
+    0 0 0 .055em #ff5252,
+    0 0 .28em .06em rgba(255, 82, 82, 0.85),
+    inset 0 .025em .03em rgba(255, 255, 255, 0.85),
+    0 .028em 0 #e6dfd0,
+    0 .056em 0 #d5cbb7,
+    0 .084em 0 #c0b49d,
+    0 .115em 0 #237d4e,
+    0 .145em 0 #185c38,
+    0 .17em 0 #103e25,
+    0 .24em .22em rgba(0, 0, 0, 0.6);
+  transform: translateY(-.04em);
 }
 
 .tile {
@@ -289,8 +393,18 @@ button:disabled {
   height: 1.1em;
   background-size: 100% 100%;
   background-repeat: no-repeat;
-  border-radius: .09em;
-  box-shadow: 0 .05em 0 #b9b2a0, 0 .08em 0 #7d7563;
+  border-radius: .10em;
+  box-shadow:
+    inset 0 .025em .03em rgba(255, 255, 255, 0.85),
+    inset 0 -.025em .03em rgba(0, 0, 0, 0.12),
+    0 .028em 0 #e6dfd0,
+    0 .056em 0 #d5cbb7,
+    0 .084em 0 #c0b49d,
+    0 .115em 0 #237d4e,
+    0 .145em 0 #185c38,
+    0 .17em 0 #103e25,
+    0 .22em .18em rgba(0, 0, 0, 0.48),
+    0 .32em .38em rgba(0, 0, 0, 0.24);
   user-select: none;
   vertical-align: bottom;
   flex-shrink: 0;
@@ -302,17 +416,48 @@ button:disabled {
 
 .tile.back-t {
   background-image: url(tiles/BackGreen.svg);
-  box-shadow: 0 .05em 0 #165233, 0 .08em 0 #0a2e1c;
+  box-shadow:
+    inset 0 .025em .03em rgba(255, 255, 255, 0.35),
+    inset 0 -.025em .03em rgba(0, 0, 0, 0.22),
+    0 .028em 0 #1f7346,
+    0 .056em 0 #155533,
+    0 .084em 0 #d9d1c0,
+    0 .115em 0 #c2b8a3,
+    0 .145em 0 #a89d86,
+    0 .20em .16em rgba(0, 0, 0, 0.5),
+    0 .30em .35em rgba(0, 0, 0, 0.25);
 }
 
 #myHand .tile {
+  --tile-3d:
+    inset 0 .025em .03em rgba(255, 255, 255, 0.88),
+    inset 0 -.025em .03em rgba(0, 0, 0, 0.14),
+    0 -.032em 0 #eee8db,
+    0 -.064em 0 #dcd3c0,
+    0 -.096em 0 #268251,
+    0 -.128em 0 #175534,
+    0 .045em 0 #b8ae97;
   font-size: 64px;
   cursor: pointer;
-  transition: transform .08s;
+  transform: perspective(520px) rotateX(8deg);
+  transform-origin: bottom center;
+  box-shadow:
+    var(--tile-3d),
+    0 .12em .14em rgba(0, 0, 0, 0.58),
+    0 .22em .30em rgba(0, 0, 0, 0.34);
+  transition: transform .12s ease-out, filter .12s, box-shadow .12s ease-out;
+}
+
+#myHand:not(.disabled) .tile:not(.locked):not(.forbid):not(.sel):hover {
+  transform: perspective(500px) rotateX(2deg) translateY(-.14em);
+  box-shadow:
+    var(--tile-3d),
+    0 .20em .22em rgba(0, 0, 0, 0.62),
+    0 .30em .38em rgba(0, 0, 0, 0.36);
 }
 
 #myHand .tile.sel {
-  transform: translateY(-.34em) scale(1.06);
+  transform: perspective(500px) rotateX(0deg) translateY(-.36em) scale(1.06);
 }
 
 #myHand .tile.drawn {
@@ -325,19 +470,24 @@ button:disabled {
 
 #me {
   grid-column: 1;
-  padding: 6px 10px 10px;
-  background: #083222;
+  padding: 8px 10px 10px;
+  background: linear-gradient(180deg, #3b200e 0%, #251307 14px, #0a3321 18px, #072618 100%);
+  border-top: 2px solid #754624;
+  box-shadow:
+    0 -8px 24px rgba(0, 0, 0, 0.55),
+    inset 0 2px 0 rgba(255, 215, 130, 0.16);
 }
 
 #myMelds {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   justify-content: flex-start;
+  align-items: center;
 }
 
 .meld {
   display: flex;
-  gap: 1px;
-  margin-right: 8px;
+  gap: 2px;
+  margin-right: 10px;
 }
 
 #actions {
@@ -408,7 +558,8 @@ button:disabled {
   grid-row: 2 / 4;
   display: flex;
   flex-direction: column;
-  background: #083222;
+  background: rgba(6, 26, 17, 0.92);
+  border-left: 1px solid rgba(212, 168, 67, 0.22);
   padding: 6px;
   min-height: 0;
 }
@@ -512,7 +663,13 @@ button:disabled {
 .cover .tile.sel {
   outline: 3px solid #f4c542;
   transform: translateY(-8px);
-  box-shadow: 0 6px 10px #0008;
+  box-shadow:
+    0 0 0 .04em #f4c542,
+    0 .028em 0 #1f7346,
+    0 .056em 0 #155533,
+    0 .084em 0 #d9d1c0,
+    0 .115em 0 #c2b8a3,
+    0 .28em .26em rgba(0, 0, 0, 0.7);
   filter: brightness(1.2);
 }
 
@@ -535,41 +692,132 @@ button:disabled {
 
 .dice {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   justify-content: center;
-  margin: 8px 0;
+  align-items: flex-end;
+  margin: 10px 0 14px;
 }
 
 .die {
-  font-size: 64px;
-  line-height: 1;
-  color: #fff;
-  text-shadow: 0 3px 6px #0008;
-  display: inline-block;
+  font-size: 56px;
+  width: 1em;
+  height: 1em;
+  padding: .13em;
+  border-radius: .2em;
+  background: linear-gradient(145deg, #fffdf9 0%, #efe7d6 68%, #ded4bf 100%);
+  display: inline-grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  box-shadow:
+    inset 0 .04em .05em #fff,
+    inset 0 -.04em .05em rgba(0, 0, 0, 0.12),
+    0 .07em 0 #c9bfa9,
+    0 .11em 0 #a3977f,
+    0 .16em .20em rgba(0, 0, 0, 0.55);
 }
+
+.die .pip {
+  display: block;
+  width: .18em;
+  height: .18em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #3a3a3a, #111);
+  box-shadow: inset 0 .02em .02em rgba(0, 0, 0, 0.6), 0 .015em 0 rgba(255, 255, 255, 0.7);
+}
+
+.die.d1 .pip {
+  width: .30em;
+  height: .30em;
+  grid-area: 2 / 2;
+  background: radial-gradient(circle at 35% 35%, #ef4444, #b91c1c);
+}
+
+.die.d4 .pip {
+  background: radial-gradient(circle at 35% 35%, #ef4444, #b91c1c);
+}
+
+.die.d2 .pip:nth-child(1),
+.die.d3 .pip:nth-child(1) { grid-area: 1 / 3; }
+.die.d2 .pip:nth-child(2),
+.die.d3 .pip:nth-child(2) { grid-area: 3 / 1; }
+.die.d3 .pip:nth-child(3) { grid-area: 2 / 2; }
+
+.die.d4 .pip:nth-child(1),
+.die.d5 .pip:nth-child(1),
+.die.d6 .pip:nth-child(1) { grid-area: 1 / 1; }
+.die.d4 .pip:nth-child(2),
+.die.d5 .pip:nth-child(2),
+.die.d6 .pip:nth-child(2) { grid-area: 1 / 3; }
+.die.d4 .pip:nth-child(3),
+.die.d5 .pip:nth-child(3),
+.die.d6 .pip:nth-child(3) { grid-area: 3 / 1; }
+.die.d4 .pip:nth-child(4),
+.die.d5 .pip:nth-child(4),
+.die.d6 .pip:nth-child(4) { grid-area: 3 / 3; }
+.die.d5 .pip:nth-child(5) { grid-area: 2 / 2; }
+.die.d6 .pip:nth-child(5) { grid-area: 2 / 1; }
+.die.d6 .pip:nth-child(6) { grid-area: 2 / 3; }
 
 .die.idle {
-  opacity: .35;
+  opacity: .42;
 }
 
-.die.roll {
-  animation: dice-roll .9s ease-out;
+/* 三顆骰子各自有不同的拋飛軌跡（使用 perspective() 在自身 transform 上，不需要 preserve-3d 鏈） */
+.die.rolling-0 { animation: die-toss-a 1.00s cubic-bezier(.20, .60, .24, 1) both; }
+.die.rolling-1 { animation: die-toss-b 1.10s cubic-bezier(.20, .60, .24, 1) .05s both; }
+.die.rolling-2 { animation: die-toss-c 1.20s cubic-bezier(.20, .60, .24, 1) .10s both; }
+
+.die.land {
+  animation: die-land .22s ease-out;
 }
 
-@keyframes dice-roll {
-  0% {
-    transform: rotate(0) translateY(-30px) scale(.6);
-    opacity: .3;
-  }
+/* 拋飛：translateY 彈跳 + perspective() rotateX/Y 模擬立體旋轉，結束在 0°（=360°×n） */
+@keyframes die-toss-a {
+  0%   { transform: perspective(260px) translateY(-42px) rotateX(-15deg) rotateY(15deg) scale(.58); opacity: .3; }
+  18%  { transform: perspective(260px) translateY(5px) rotateX(115deg) rotateY(75deg) scale(1.09); opacity: 1; }
+  35%  { transform: perspective(260px) translateY(-18px) rotateX(240deg) rotateY(135deg) scale(.90); }
+  51%  { transform: perspective(260px) translateY(3px) rotateX(360deg) rotateY(190deg) scale(1.04); }
+  65%  { transform: perspective(260px) translateY(-8px) rotateX(460deg) rotateY(240deg) scale(.97); }
+  77%  { transform: perspective(260px) translateY(2px) rotateX(550deg) rotateY(280deg) scale(1.01); }
+  87%  { transform: perspective(260px) translateY(-3px) rotateX(622deg) rotateY(315deg) scale(.99); }
+  100% { transform: perspective(260px) translateY(0) rotateX(720deg) rotateY(360deg) scale(1); }
+}
 
-  60% {
-    transform: rotate(540deg) translateY(4px) scale(1.1);
-    opacity: 1;
-  }
+@keyframes die-toss-b {
+  0%   { transform: perspective(260px) translateY(-46px) rotateX(10deg) rotateY(-20deg) scale(.56); opacity: .3; }
+  20%  { transform: perspective(260px) translateY(5px) rotateX(-75deg) rotateY(140deg) scale(1.10); opacity: 1; }
+  38%  { transform: perspective(260px) translateY(-21px) rotateX(-155deg) rotateY(300deg) scale(.88); }
+  54%  { transform: perspective(260px) translateY(4px) rotateX(-220deg) rotateY(400deg) scale(1.05); }
+  68%  { transform: perspective(260px) translateY(-8px) rotateX(-268deg) rotateY(475deg) scale(.96); }
+  80%  { transform: perspective(260px) translateY(2px) rotateX(-302deg) rotateY(530deg) scale(1.01); }
+  90%  { transform: perspective(260px) translateY(-2px) rotateX(-326deg) rotateY(560deg) scale(.995); }
+  100% { transform: perspective(260px) translateY(0) rotateX(-360deg) rotateY(720deg) scale(1); }
+}
 
-  100% {
-    transform: rotate(720deg) translateY(0) scale(1);
-  }
+@keyframes die-toss-c {
+  0%   { transform: perspective(260px) translateY(-40px) rotateX(20deg) rotateY(25deg) scale(.60); opacity: .3; }
+  22%  { transform: perspective(260px) translateY(5px) rotateX(195deg) rotateY(195deg) scale(1.08); opacity: 1; }
+  40%  { transform: perspective(260px) translateY(-17px) rotateX(348deg) rotateY(355deg) scale(.91); }
+  56%  { transform: perspective(260px) translateY(3px) rotateX(450deg) rotateY(465deg) scale(1.03); }
+  70%  { transform: perspective(260px) translateY(-6px) rotateX(518deg) rotateY(530deg) scale(.97); }
+  82%  { transform: perspective(260px) translateY(1px) rotateX(563deg) rotateY(575deg) scale(1.01); }
+  91%  { transform: perspective(260px) translateY(-2px) rotateX(590deg) rotateY(600deg) scale(.995); }
+  100% { transform: perspective(260px) translateY(0) rotateX(720deg) rotateY(720deg) scale(1); }
+}
+
+@keyframes die-land {
+  0%   { transform: scale(1.14); }
+  55%  { transform: scale(.96); }
+  100% { transform: scale(1); }
+}
+
+.dice-res.reveal {
+  animation: dice-res-in .28s ease-out .95s both;
+}
+
+@keyframes dice-res-in {
+  from { opacity: 0; transform: translateY(6px) scale(.93); }
+  to   { opacity: 1; transform: none; }
 }
 
 .seatpick {
@@ -583,7 +831,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .seatpick .tile {
@@ -592,21 +840,37 @@ button:disabled {
 
 .seatpick .tile.pickable {
   cursor: pointer;
-  transition: transform .1s;
+  transition: transform .12s;
 }
 
 .seatpick .tile.pickable:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 8px 12px #0008;
+  transform: translateY(-.12em);
+  box-shadow:
+    inset 0 .025em .03em rgba(255, 255, 255, 0.35),
+    0 .028em 0 #1f7346,
+    0 .056em 0 #155533,
+    0 .084em 0 #d9d1c0,
+    0 .115em 0 #c2b8a3,
+    0 .145em 0 #a89d86,
+    0 .28em .24em rgba(0, 0, 0, 0.65);
 }
 
 .seatpick .tile.taken {
-  opacity: .9;
+  opacity: .95;
 }
 
 .seatpick .tile.facedown {
   background-image: url(tiles/BackGreen.svg);
-  box-shadow: 0 .05em 0 #165233, 0 .08em 0 #0a2e1c;
+  box-shadow:
+    inset 0 .025em .03em rgba(255, 255, 255, 0.35),
+    inset 0 -.025em .03em rgba(0, 0, 0, 0.22),
+    0 .028em 0 #1f7346,
+    0 .056em 0 #155533,
+    0 .084em 0 #d9d1c0,
+    0 .115em 0 #c2b8a3,
+    0 .145em 0 #a89d86,
+    0 .20em .16em rgba(0, 0, 0, 0.5),
+    0 .30em .35em rgba(0, 0, 0, 0.25);
 }
 
 .seatname {
@@ -617,7 +881,15 @@ button:disabled {
 
 /* 吃進來的那張牌 (放在中間)，加黃框標示 */
 .tile.claimed {
-  box-shadow: inset 0 0 0 .07em #f4c542, 0 .05em 0 #c9a227, 0 .08em 0 #8a6d12;
+  box-shadow:
+    inset 0 0 0 .07em #f4c542,
+    0 .028em 0 #dfbe5b,
+    0 .056em 0 #c9a227,
+    0 .084em 0 #a8851a,
+    0 .115em 0 #237d4e,
+    0 .145em 0 #185c38,
+    0 .17em 0 #103e25,
+    0 .22em .18em rgba(0, 0, 0, 0.48);
   filter: sepia(.25);
 }
 
@@ -1136,7 +1408,7 @@ button.small {
 #myHand .tile.tingable::after {
   content: '▲';
   position: absolute;
-  top: -16px;
+  top: -.34em;
   left: 50%;
   transform: translateX(-50%);
   font-size: 13px;
@@ -1227,12 +1499,17 @@ button,
   #table {
     grid-template-columns: 74px 1fr 74px;
     gap: 4px;
-    padding: 4px;
+    padding: 5px;
+    margin: 2px 3px 0;
+    border-radius: 12px;
+    border-width: 1px;
+    perspective: 900px;
   }
 
   .seat {
     font-size: 11px;
     padding: 4px;
+    border-radius: 7px;
   }
 
   .seat .nm {
@@ -1261,14 +1538,17 @@ button,
 
   .seat .melds,
   .seat .flw {
-    gap: 1px;
-    margin-top: 2px;
+    gap: 4px 2px;
+    margin-top: 3px;
   }
 
   #center {
     min-height: 0;
-    padding: 4px;
-    gap: 4px;
+    padding: 5px;
+    gap: 5px;
+    border-width: 2px;
+    border-radius: 9px;
+    transform: rotateX(4deg);
   }
 
   #center .pool .tile {
@@ -1276,7 +1556,7 @@ button,
   }
 
   .pool {
-    gap: 2px;
+    gap: 6px 3px;
   }
 
   .cover {
@@ -1288,6 +1568,16 @@ button,
     font-size: 12px;
     padding: 6px 8px;
     min-width: 0;
+    border-width: 1px;
+  }
+
+  #info.has-compass {
+    padding: 18px 26px;
+  }
+
+  .cw {
+    font-size: 9px;
+    padding: 1px 4px;
   }
 
   #info .big {
@@ -1295,7 +1585,7 @@ button,
   }
 
   #me {
-    padding: 4px 6px 8px;
+    padding: 6px 6px 8px;
     padding-bottom: max(8px, env(safe-area-inset-bottom));
   }
 
@@ -1363,12 +1653,12 @@ button,
   }
 
   #myHand .tile.tingable::after {
-    top: -12px;
+    top: -.36em;
     font-size: 10px;
   }
 
-  .die {
-    font-size: 44px;
+  .die-slot {
+    font-size: 42px;
   }
 
   .seatpick {
@@ -1488,7 +1778,8 @@ button,
   }
 
   #myHand {
-    row-gap: 10px;
+    row-gap: 14px;
+    margin-top: 6px;
   }
 
   #myHand .tile {
@@ -1524,6 +1815,10 @@ button,
   .seat.top .melds,
   .seat.top .flw {
     margin: 0;
+  }
+
+  #center {
+    transform: none;
   }
 
   #center .pool .tile {
@@ -1569,7 +1864,7 @@ button,
     font-size: 14px;
   }
 
-  .die {
+  .die-slot {
     font-size: 34px;
   }
 
@@ -1643,7 +1938,11 @@ button,
 }
 
 #myHand .tile.swapin {
-  box-shadow: 0 0 0 .05em #4fc3f7, 0 0 .25em #4fc3f7, 0 .05em 0 #b9b2a0, 0 .08em 0 #7d7563;
+  box-shadow:
+    0 0 0 .05em #4fc3f7,
+    0 0 .25em #4fc3f7,
+    var(--tile-3d),
+    0 .11em .12em rgba(0, 0, 0, 0.55);
 }
 
 #myHand .tile.swapin::before {
@@ -2084,12 +2383,16 @@ button.danger {
 
 /* ---------- 選牌更明顯 ---------- */
 #myHand .tile {
-  transition: transform .12s ease-out, filter .12s;
+  transition: transform .12s ease-out, filter .12s, box-shadow .12s ease-out;
 }
 
 #myHand .tile.sel {
   z-index: 3;
-  box-shadow: 0 0 0 .055em #f4c542, 0 0 .3em .06em #f4c542, 0 .35em .5em #000b;
+  box-shadow:
+    0 0 0 .055em #f4c542,
+    0 0 .32em .08em rgba(244, 197, 66, 0.8),
+    var(--tile-3d),
+    0 .36em .46em rgba(0, 0, 0, 0.72);
 }
 
 #myHand.has-sel .tile:not(.sel) {
@@ -2099,7 +2402,7 @@ button.danger {
 .seltag {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + .42em);
+  bottom: calc(100% + .48em);
   transform: translateX(-50%);
   background: #f4c542;
   color: #3a2a00;
@@ -2126,7 +2429,7 @@ button.danger {
 /* 已選牌且打出後會聽牌：▲ 標記往上讓位給提示 */
 #myHand .tile.sel.tingable::after {
   top: auto;
-  bottom: calc(100% + 1.95em);
+  bottom: calc(100% + 2.1em);
 }
 
 /* 語音開關 */
@@ -2628,4 +2931,290 @@ button.danger {
 .radarbox {
   max-width: 420px;
   margin: 8px auto 4px;
+}
+
+/* ================= 桌機：立體牌桌 + 浮動座位 =================
+   只套用在寬螢幕。牌桌 (#center) 往後傾斜成梯形，三位對手的資訊卡浮在桌邊。
+   手機、平板 (<=1000px) 維持原本的版面。 */
+@media (min-width: 1001px) {
+  #table {
+    position: relative;
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background:
+      radial-gradient(ellipse at 50% 38%, rgba(60, 140, 95, 0.22) 0%, transparent 62%),
+      radial-gradient(ellipse at 50% 50%, #0d3a25 0%, #07251a 70%, #041610 100%);
+    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.6);
+    perspective: 1000px;
+    perspective-origin: 50% 8%;
+    overflow: hidden;
+  }
+
+  /* 牌桌：木框 + 綠絨布，往後傾斜 */
+  #center {
+    position: absolute;
+    top: 64px;
+    bottom: 10px;
+    left: 170px;
+    right: 170px;
+    min-height: 0;
+    padding: 14px 18px;
+    border: 14px solid #6a3a17;
+    border-radius: 34px;
+    background:
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.025) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at 50% 45%, #1a8a57 0%, #11663e 58%, #0a4528 100%);
+    box-shadow:
+      inset 0 0 0 2px rgba(0, 0, 0, 0.35),
+      inset 0 14px 40px rgba(0, 0, 0, 0.5),
+      0 0 0 3px #3a1d0a,
+      0 26px 50px rgba(0, 0, 0, 0.7);
+    transform: rotateX(26deg);
+    transform-origin: 50% 100%;
+    overflow-y: auto;
+  }
+
+  #center .pool .tile {
+    font-size: min(56px, 5.6vh);
+  }
+
+  /* 三位對手：浮在桌邊的資訊卡 */
+  .seat {
+    position: absolute;
+    z-index: 3;
+    width: 154px;
+    max-height: 62%;
+    padding: 8px 10px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(14, 40, 30, 0.9), rgba(6, 22, 16, 0.94));
+    border: 1px solid rgba(212, 168, 67, 0.4);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .seat.top {
+    top: 8px;
+    left: 0;
+    right: 0;
+    width: fit-content;
+    min-width: 220px;
+    max-width: 62%;
+    margin: 0 auto;
+    padding: 6px 16px;
+  }
+
+  .seat.top .nm {
+    display: inline-block;
+    margin-right: 10px;
+  }
+
+  .seat.top .hcount,
+  .seat.top > div:nth-child(2) {
+    display: inline-block;
+    margin-right: 10px;
+  }
+
+  .seat.left {
+    top: 26%;
+    left: 8px;
+  }
+
+  .seat.right {
+    top: 26%;
+    right: 8px;
+  }
+
+  .seat .nm {
+    margin-bottom: 2px;
+    word-break: break-all;
+  }
+
+  /* 對手的蓋牌不畫出來，只顯示張數；結算時攤牌才顯示 */
+  .backs:not(.revealed) {
+    display: none;
+  }
+
+  .hcount {
+    display: block;
+    color: #9c9;
+  }
+
+  .seat:has(.backs.revealed) {
+    width: 300px;
+  }
+
+  .seat .backs.revealed .tile {
+    font-size: 22px;
+  }
+
+  /* 對手的副露、花牌縮小，放得進資訊卡 */
+  .seat .meld .tile,
+  .seat .meld .tile.sm,
+  .seat .flw .tile.sm {
+    font-size: min(26px, 3vh);
+  }
+
+  .seat .melds,
+  .seat .flw {
+    margin-top: 4px;
+  }
+
+  .seat .melds:empty,
+  .seat .flw:empty {
+    display: none;
+  }
+}
+
+/* ---------- 桌機：四家牌河各自朝向自己，排成一列 6 張的方塊 ----------
+   每家的牌河是同一種方塊 (第一列靠自己這邊、往中央一列列疊上去)，
+   再依座位旋轉 0° / 90° / 180° / -90° 貼在桌邊。 */
+@media (min-width: 1001px) {
+  #center {
+    --pt: min(40px, 4.2vh);
+    --pw: calc(var(--pt) * 5.45);
+  }
+
+  #center .pool {
+    position: absolute;
+    width: var(--pw);
+    display: flex;
+    flex-flow: row wrap-reverse;
+    justify-content: flex-start;
+    align-content: flex-start;
+    gap: calc(var(--pt) * 0.08) calc(var(--pt) * 0.06);
+  }
+
+  #center .pool .tile {
+    font-size: var(--pt);
+  }
+
+  /* 自己：貼桌子下緣 */
+  #center .pool.p0 {
+    left: 50%;
+    bottom: 10px;
+    margin-left: calc(var(--pw) / -2);
+    padding: 0;
+  }
+
+  /* 對家：整塊轉 180°，貼桌子上緣 */
+  #center .pool.p2 {
+    left: 50%;
+    top: 10px;
+    margin-left: calc(var(--pw) / -2);
+    transform: rotate(180deg);
+  }
+
+  /* 上家 (左)：順時針轉 90°，貼桌子左緣，垂直置中 */
+  #center .pool.p3 {
+    left: 10px;
+    top: 50%;
+    transform-origin: 0 100%;
+    transform: translate(0, calc(-100% - var(--pw) / 2)) rotate(90deg);
+  }
+
+  /* 下家 (右)：逆時針轉 90°，貼桌子右緣，垂直置中 */
+  #center .pool.p1 {
+    right: 10px;
+    top: 50%;
+    transform-origin: 100% 100%;
+    transform: translate(0, calc(-100% - var(--pw) / 2)) rotate(-90deg);
+  }
+}
+
+/* ---------- 牌牆 (桌機)：四面各 18 墩，每墩 2 張疊在一起 ----------
+   每面牆都是同一種方塊 (--dy 是厚度往哪邊畫)，再依座位旋轉貼在桌邊。
+   手機、平板不顯示牌牆。 */
+.wall {
+  display: none;
+}
+
+@media (min-width: 1001px) {
+  #center {
+    --ws: min(30px, 3.2vh);
+    --ww: calc(var(--ws) * 15.4);
+    --th: calc(var(--ws) * 0.07);
+  }
+
+  .wall {
+    display: flex;
+    position: absolute;
+    width: var(--ww);
+    font-size: var(--ws);
+    gap: 0.03em;
+    pointer-events: none;
+    --dx: 0;
+    --dy: -1;
+  }
+
+  .wall .st {
+    flex: none;
+    display: block;
+    width: 0.825em;
+    height: 1.1em;
+    border-radius: 0.08em;
+    background: linear-gradient(135deg, #3aa56d 0%, #20744a 100%);
+  }
+
+  .wall .st.n0 {
+    visibility: hidden;
+  }
+
+  /* 2 張：綠(牌背)、象牙(牌身) 各兩層；1 張：只畫一張的厚度 */
+  .wall .st.n2 {
+    box-shadow:
+      inset 0 0 0 0.04em rgba(0, 0, 0, 0.22),
+      calc(var(--dx) * var(--th) * 1) calc(var(--dy) * var(--th) * 1) 0 #1c6a43,
+      calc(var(--dx) * var(--th) * 2) calc(var(--dy) * var(--th) * 2) 0 #e9e2d0,
+      calc(var(--dx) * var(--th) * 3) calc(var(--dy) * var(--th) * 3) 0 #1c6a43,
+      calc(var(--dx) * var(--th) * 4) calc(var(--dy) * var(--th) * 4) 0 #d8cfb8,
+      calc(var(--dx) * var(--th) * 5) calc(var(--dy) * var(--th) * 5) 0.2em rgba(0, 0, 0, 0.55);
+  }
+
+  .wall .st.n1 {
+    box-shadow:
+      inset 0 0 0 0.04em rgba(0, 0, 0, 0.22),
+      calc(var(--dx) * var(--th) * 1) calc(var(--dy) * var(--th) * 1) 0 #e9e2d0,
+      calc(var(--dx) * var(--th) * 2) calc(var(--dy) * var(--th) * 2) 0 #d8cfb8,
+      calc(var(--dx) * var(--th) * 3) calc(var(--dy) * var(--th) * 3) 0.2em rgba(0, 0, 0, 0.55);
+  }
+
+  /* 自己這面牆從外側看，厚度畫在下方；其他三面看到的是朝向牌桌中央的那一側 */
+  .wall.w0 {
+    --dy: 1;
+    left: 50%;
+    bottom: 8px;
+    margin-left: calc(var(--ww) / -2);
+  }
+
+  .wall.w2 {
+    left: 50%;
+    top: 8px;
+    margin-left: calc(var(--ww) / -2);
+    transform: rotate(180deg);
+  }
+
+  .wall.w3 {
+    left: 8px;
+    top: 50%;
+    transform-origin: 0 100%;
+    transform: translate(0, calc(-100% - var(--ww) / 2)) rotate(90deg);
+  }
+
+  .wall.w1 {
+    right: 8px;
+    top: 50%;
+    transform-origin: 100% 100%;
+    transform: translate(0, calc(-100% - var(--ww) / 2)) rotate(-90deg);
+  }
+
+  /* 牌河往內縮，讓出牌牆的位置 */
+  #center .pool.p0 { bottom: calc(var(--ws) * 1.75 + 8px); }
+  #center .pool.p2 { top: calc(var(--ws) * 1.75 + 8px); }
+  #center .pool.p3 { left: calc(var(--ws) * 1.75 + 8px); }
+  #center .pool.p1 { right: calc(var(--ws) * 1.75 + 8px); }
 }
