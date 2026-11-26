@@ -1139,7 +1139,8 @@ class Room {
       }
     } else if (this.phase === 'swapPick') {
       const i = this.turn;
-      if (this.isAuto(i)) setTimeout(() => { if (seq === this.seq && this.phase === 'swapPick' && this.turn === i) this.autoPick(i); }, BOT_DELAY);
+      // 取牌一律隨機自動取，不論真人或電腦
+      setTimeout(() => { if (seq === this.seq && this.phase === 'swapPick' && this.turn === i) this.autoPick(i); }, BOT_DELAY);
     } else if (this.phase === 'lastDraw' && this.isAuto(this.turn)) {
       const i = this.turn;
       // 電腦未聽牌：不摸，直接結束

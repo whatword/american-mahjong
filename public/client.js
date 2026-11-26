@@ -528,7 +528,7 @@ function renderGame() {
   const isSpectator = !!S.spectating;
   const me = S.you;
   const swapMode = S.phase === 'swapSelect' && !S.seats[me].confirmed && !isSpectator; // 我正在選要蓋的 3 張牌
-  const pickMode = S.phase === 'swapPick' && S.turn === me && !isSpectator; // 輪到我取牌
+  const pickMode = false; // 取牌改為系統自動隨機取；原條件：S.phase === 'swapPick' && S.turn === me && !isSpectator; // 輪到我取牌
   const key = `${S.handNo}-${S.phase}-${S.swapLeft}-${pickMode ? S.turn : ''}`;
   if (key !== swapKey) { swapKey = key; swapSel = []; swapPicks = {}; }
   // 換牌取牌：某一家只剩一張蓋牌可取時，直接幫玩家選好
@@ -855,7 +855,8 @@ function renderActionsInto(box) {
     return;
   }
   if (S.phase === 'swapPick') {
-    if (S.turn !== S.you) { box.innerHTML = `<span class="hint">等待 ${S.seats[S.turn].name} 取牌…</span>`; return; }
+    box.innerHTML = `<span class="hint">${S.turn === S.you ? '系統自動隨機幫你取牌…' : `${S.seats[S.turn].name} 取牌中…`}</span>`;
+    return;
     const others = [0, 1, 2, 3].filter((p) => p !== S.you);
     const picked = others.filter((p) => swapPicks[p] !== undefined).length;
     const forced = others.filter((p) => S.seats[p].cover && S.seats[p].cover.filter(Boolean).length === 1);
