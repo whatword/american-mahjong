@@ -2920,6 +2920,11 @@ button.danger {
   padding: 0 .35em;
 }
 
+/* 換／不換、摸／不摸：兩顆按鈕中間隔開一點 */
+#actions button.rbtn.swapno {
+  margin-left: 18px;
+}
+
 #actions button.rbtn.migi.ready {
   background: #e67e22;
   color: #fff;
