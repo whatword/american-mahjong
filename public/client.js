@@ -715,6 +715,20 @@ function renderGame() {
     S.myTaken.forEach((t) => tk.appendChild(tileEl(t, 'sm')));
     mm.appendChild(tk);
   }
+  // 吃碰槓的牌依發生順序翻開，放在花牌旁
+  if (S.seats[me].melds.length) {
+    const zone = document.createElement('div');
+    zone.className = 'meld-zone';
+    const lb = document.createElement('span');
+    lb.className = 'meld-label';
+    lb.textContent = '吃碰槓';
+    zone.appendChild(lb);
+    const ms = document.createElement('div');
+    ms.className = 'meld-list';
+    S.seats[me].melds.forEach((m) => ms.appendChild(meldEl(m)));
+    zone.appendChild(ms);
+    mm.appendChild(zone);
+  }
   const fl = document.createElement('span');
   fl.style.cssText = 'display:flex;gap:2px;margin-left:10px';
   S.seats[me].flowers.forEach((t) => fl.appendChild(tileEl(t, 'sm')));
@@ -761,23 +775,6 @@ function renderGame() {
   const swapLeft = {};
   for (const t of S.swapIn || []) swapLeft[t] = (swapLeft[t] || 0) + 1;
   const swapped = (t) => (swapLeft[t] > 0 ? (swapLeft[t]--, ' swapin') : '');
-  // 吃碰槓的牌依發生順序翻開，排在手牌最左邊
-  if (S.seats[me].melds.length) {
-    const zone = document.createElement('div');
-    zone.className = 'meld-zone';
-    const lb = document.createElement('span');
-    lb.className = 'meld-label';
-    lb.textContent = '吃碰槓';
-    zone.appendChild(lb);
-    const ms = document.createElement('div');
-    ms.className = 'meld-list';
-    S.seats[me].melds.forEach((m) => ms.appendChild(meldEl(m)));
-    zone.appendChild(ms);
-    hand.appendChild(zone);
-    const dv = document.createElement('div');
-    dv.className = 'zone-divider';
-    hand.appendChild(dv);
-  }
   (S.hand || []).forEach((t, k) => addTile(t, tingable(t) + locked + swapped(t) + (forbid.has(t) ? ' forbid' : ''), k));
   if (S.drawn != null) addTile(S.drawn, 'drawn' + tingable(S.drawn) + swapped(S.drawn), 'drawn');
   patchChildren(handEl, [...hand.childNodes]);
