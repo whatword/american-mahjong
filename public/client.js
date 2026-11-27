@@ -1016,6 +1016,8 @@ function renderActionsInto(box) {
     if (kongs.length) {
       const row = document.createElement('div');
       row.className = 'claimbtns';
+      // 連續槓：按鈕外觀相同但槓的牌不同時，不能沿用舊按鈕 (舊的點擊會送出上一次的槓)
+      row.dataset.kongs = kongs.map((k) => `${k.type}:${k.tile}`).join(',');
       const doKong = (k) => { kongPick = false; send({ type: k.type, tile: k.tile }); };
       roundBtn(row, '吃', 'chi', false);
       roundBtn(row, '碰', 'pong', false);
