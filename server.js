@@ -1457,7 +1457,8 @@ wss.on('connection', (ws) => {
         const allowed = [...new Set(room.allowedDiscards(seat))];
         const s = room.seats[seat];
         const tile = s.migi ? s.drawn : AI.chooseDiscard(room, seat, allowed).tile;
-        if (tile != null) send(ws, { type: 'recommend', tile });
+        const adv = AI.adviseTiles(room, seat, allowed);
+        send(ws, { type: 'recommend', tile, danger: adv.danger, safe: adv.safe, key: msg.key });
         break;
       }
       case 'auto': {

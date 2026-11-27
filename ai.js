@@ -208,6 +208,20 @@ function chooseDiscard(room, seat, candidates) {
   return best;
 }
 
+// 眼睛提示用：每種可打的牌標成危險 / 安全 (沒有對手威脅時都不標)
+function adviseTiles(room, seat, candidates) {
+  const unseen = unseenCounts(room, seat);
+  const threats = threatsFor(room, seat);
+  if (Math.max(...threats) < 0.5) return { danger: [], safe: [] };
+  const danger = [], safe = [];
+  for (const t of new Set(candidates)) {
+    const d = dangerOf(room, seat, t, unseen, threats);
+    if (d >= 0.6) danger.push(t);
+    else if (d <= 0.15) safe.push(t);
+  }
+  return { danger, safe };
+}
+
 // 依序挑出最不需要的 n 張 (換牌用)
 function chooseWorst(room, seat, n) {
   const s = room.seats[seat];
@@ -339,4 +353,4 @@ function reviewDiscard(room, seat, tile, candidates) {
   };
 }
 
-module.exports = { reviewDiscard, decideSwap, threatOf, dangerFor, passedBy, shanten, handShanten, unseenCounts, chooseDiscard, chooseWorst, decideClaim, decideKong, currentState };
+module.exports = { adviseTiles, reviewDiscard, decideSwap, threatOf, dangerFor, passedBy, shanten, handShanten, unseenCounts, chooseDiscard, chooseWorst, decideClaim, decideKong, currentState };

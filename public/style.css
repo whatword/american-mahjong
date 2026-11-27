@@ -2869,3 +2869,31 @@ button.danger {
     align-items: center;
   }
 }
+
+/* ---------- 眼睛提示：牌上方的標示 (不可點、不影響選牌) ---------- */
+.eye-btn {
+  cursor: pointer;
+}
+
+.eye-mark {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  font-size: .3em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 4;
+  filter: drop-shadow(0 1px 2px #000a);
+}
+
+/* 💡 ℹ️ 🤖 排成一列 */
+.myicons {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.auto-icon {
+  cursor: pointer;
+}

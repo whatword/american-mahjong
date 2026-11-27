@@ -123,8 +123,7 @@ function connect(name, email) {
     else if (m.type === 'say') showSay(m);
     else if (m.type === 'recommend') {
       if (!S || S.phase !== 'discard' || S.turn !== S.you) return;
-      const k = S.hand.indexOf(m.tile);
-      selected = S.drawn === m.tile ? 'drawn' : k >= 0 ? k : null;
+      advice = { key: m.key, tile: m.tile, danger: new Set(m.danger || []), safe: new Set(m.safe || []) };
       renderGame();
     }
     else if (m.type === 'habitFile') downloadFile(m);
@@ -693,20 +692,36 @@ function renderGame() {
   const mm = document.createElement('div');
   const viewingBadge = isSpectator ? '<span class="tag viewing-tag">當前視角</span>' : '';
   // 名稱下方放聽牌小燈泡 (亮起時點一下看聽牌內容)
-  const lamp = !isSpectator && S.ting ? '<button type="button" id="tingLamp" class="ting-lamp" title="聽牌提醒" aria-label="聽牌提醒">💡</button>' : '';
+  const lampBtns = (!isSpectator && S.ting ? '<button type="button" id="tingLamp" class="ting-lamp" title="聽牌提醒" aria-label="聽牌提醒">💡</button>' : '') +
+    (!isSpectator && !S.seats[me].bot ? `<button type="button" id="eyeBtn" class="ting-lamp eye-btn${eyeOn ? ' on' : ''}" title="牌面提示（推薦／危險／安全）" aria-label="牌面提示" aria-pressed="${eyeOn}">ℹ️</button>` : '');
+  const lamp = `<span class="myicons">${lampBtns}</span>`;
   mm.innerHTML = `<span class="myname"><span>${wind} ${S.seats[me].name}${viewingBadge}${me === S.dealer ? ' 莊' : ''}${me === S.dealer && S.streak ? ` <b class="streak">🔥 連${S.streak}拉${S.streak}</b>` : ''} 💰${S.scores[me]}</span>${lamp}</span>` +
     (S.seats[me].migi ? '<span class="migi-badge">MIGI</span>' : '');
   const lampEl = mm.querySelector('#tingLamp');
   if (lampEl) lampEl.onclick = (ev) => { ev.stopPropagation(); tingOpen = !tingOpen; renderGame(); };
+  const eyeEl = mm.querySelector('#eyeBtn');
+  if (eyeEl) eyeEl.onclick = (ev) => { ev.stopPropagation(); eyeOn = !eyeOn; renderGame(); };
+  // 眼睛開啟時，輪到自己就向伺服器要建議 (每個手牌狀態只問一次)
+  const adviceKey = `${(S.hand || []).join(',')}|${S.drawn}`;
+  const haveAdvice = !!(advice && advice.key === adviceKey);
+  const adv = eyeOn && myTurn && haveAdvice ? advice : null;
+  if (eyeOn && myTurn && !haveAdvice && askedKey !== adviceKey) {
+    askedKey = adviceKey;
+    send({ type: 'recommend', key: adviceKey });
+  }
+  if (!myTurn || !eyeOn) askedKey = null;
+  const recMarked = { done: false };
   if (!isSpectator && !S.seats[me].bot) {
     const tg = document.createElement('button');
     const on = !!S.seats[me].auto;
     tg.type = 'button';
-    tg.className = 'auto-toggle' + (on ? ' on' : '');
-    tg.textContent = on ? '🤖 代打中' : '🤖 代打';
-    tg.title = '開啟後所有決策由電腦自動完成';
+    tg.className = 'ting-lamp auto-icon' + (on ? ' on' : '');
+    tg.textContent = '🤖';
+    tg.title = on ? '代打中（點一下取消）' : '開啟後所有決策由電腦自動完成';
+    tg.setAttribute('aria-label', '電腦代打');
+    tg.setAttribute('aria-pressed', String(on));
     tg.onclick = () => send({ type: 'auto', on: !on });
-    mm.insertBefore(tg, mm.firstChild.nextSibling);
+    mm.querySelector('.myicons').appendChild(tg);
   }
   if (S.myTaken && S.myTaken.length) {
     const tk = document.createElement('span');
@@ -763,6 +778,15 @@ function renderGame() {
         else { selected = idx; renderGame(); }
       };
     }
+    if (adv) {
+      // 只是標示，不會讓牌進入選取狀態
+      const mark = (cls, text, title) => e.appendChild(Object.assign(document.createElement('span'), { className: 'eye-mark ' + cls, textContent: text, title }));
+      if (!recMarked.done && t === adv.tile) {
+        recMarked.done = true;
+        mark('rec', '🤖⬇', '電腦推薦打這張');
+      } else if (adv.danger.has(t)) mark('danger', '⚠️', '危險牌');
+      else if (adv.safe.has(t)) mark('safe', '✅', '安全牌');
+    }
     hand.appendChild(e);
   };
   // 打出後能聽牌的牌，在牌上加小標記
@@ -791,6 +815,9 @@ function renderGame() {
 
 // 聽牌提示：聽哪些牌、各剩幾張 (只扣掉自己看得到的牌)
 let tingOpen = false;
+let eyeOn = false; // 眼睛提示，預設關閉
+let advice = null;
+let askedKey = null;
 document.addEventListener('click', (ev) => {
   if (tingOpen && !ev.target.closest('#tingBar')) { tingOpen = false; if (S) renderGame(); }
 });
@@ -971,7 +998,6 @@ function renderActionsInto(box) {
       box.appendChild(row);
       return;
     }
-    btn('電腦推薦', '', () => send({ type: 'recommend' }));
     if (a.locked) {
       box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中：點兩下摸進的牌打出' }));
       return;
