@@ -384,9 +384,8 @@ class Room {
     for (const s of this.seats) { s.cover = null; s.taken = []; s.confirmed = false; }
     // 莊家已在開局抽過門牌 (17 張)，換牌結束直接出牌，不再摸牌
     const d = this.seats[this.dealer];
-    // 有換過牌：以排序後最右邊 (最大) 的牌當作第 17 張，畫面上手牌維持排序
-    if (this.swapsDone > 0) d.drawn = Math.max(...d.hand);
-    else if (d.drawn == null || !d.hand.includes(d.drawn)) d.drawn = d.hand[d.hand.length - 1];
+    // 不論有沒有換牌：以排序後最右邊 (最大) 的牌當作第 17 張，畫面上手牌維持排序
+    d.drawn = Math.max(...d.hand);
     this.enterDiscard(this.dealer);
   }
 
