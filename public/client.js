@@ -853,6 +853,18 @@ function renderTing(myTurn) {
   finish();
 }
 
+// 圓角方形的動作按鈕：可以做的亮起來，不能做的灰掉
+function roundBtn(row, label, cls, enabled, fn, active) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'rbtn ' + cls + (enabled ? ' ready' : '') + (active ? ' active' : '');
+  b.textContent = label;
+  b.disabled = !enabled;
+  if (enabled && fn) b.onclick = fn;
+  row.appendChild(b);
+  return b;
+}
+
 function btn(text, cls, fn) {
   const b = document.createElement('button');
   b.textContent = text;
@@ -950,7 +962,18 @@ function renderActionsInto(box) {
   if (S.phase === 'discard' && S.turn === S.you && S.actions) {
     const a = S.actions;
     // 可以自摸時，只顯示自摸按鈕 (不顯示 MIGI、暗槓、加槓)
-    if (a.hu) { btn('自摸', 'hu', () => send({ type: 'hu' })); return; }
+    // 可以自摸時，一樣顯示五個按鈕，「胡」改成「自摸」；不胡就直接打牌，所以「過」不能按
+    if (a.hu) {
+      const row = document.createElement('div');
+      row.className = 'claimbtns';
+      roundBtn(row, '吃', 'chi', false);
+      roundBtn(row, '碰', 'pong', false);
+      roundBtn(row, '槓', 'kong', false);
+      roundBtn(row, '自摸', 'hu zimo', true, () => send({ type: 'hu' }));
+      roundBtn(row, '過', 'pass', false);
+      box.appendChild(row);
+      return;
+    }
     btn('電腦推薦', '', () => send({ type: 'recommend' }));
     if (a.locked) {
       box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中：點兩下摸進的牌打出' }));
@@ -977,15 +1000,7 @@ function renderActionsInto(box) {
     // 五個圓形按鈕：可以做的亮起來，不能做的灰掉不能點
     const row = document.createElement('div');
     row.className = 'claimbtns';
-    const round = (label, cls, enabled, fn) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'rbtn ' + cls + (enabled ? ' ready' : '') + (claimPick === cls ? ' active' : '');
-      b.textContent = label;
-      b.disabled = !enabled;
-      if (enabled) b.onclick = fn;
-      row.appendChild(b);
-    };
+    const round = (label, cls, enabled, fn) => roundBtn(row, label, cls, enabled, fn, claimPick === cls);
     // 只有一種選擇就直接執行，有多種 (例如吃 123 / 234) 才跳出選擇框
     const choose = (kind, count, run) => () => {
       if (count > 1) { claimPick = claimPick === kind ? null : kind; renderGame(); }
@@ -1010,7 +1025,8 @@ function renderActionsInto(box) {
       round('槓', 'kong', !!o.kong, () => done({ type: 'kong' }));
       round('胡', 'hu', !!o.hu, () => done({ type: 'hu' }));
     }
-    round('過', 'pass', !o.forced, () => done({ type: 'pass' }));
+    // 可以胡別人的牌時，不胡就是「過水」
+    round(o.hu ? '過水' : '過', 'pass' + (o.hu ? ' guoshui' : ''), !o.forced, () => done({ type: 'pass' }));
     box.appendChild(row);
     if (o.forced) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI 中必須胡牌' }));
   } else if (S.phase === 'claim' && S.claim && S.claim.resp) {
