@@ -2897,3 +2897,16 @@ button.danger {
 .auto-icon {
   cursor: pointer;
 }
+
+/* 換／不換：寬度隨文字 */
+#actions button.rbtn.swap,
+#actions button.rbtn.swapno {
+  width: auto;
+  min-width: 1em;
+  padding: 0 .35em;
+}
+
+#actions button.rbtn.swap.ready {
+  background: #2563eb;
+  color: #fff;
+}

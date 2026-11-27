@@ -526,7 +526,7 @@ function renderGame() {
   updateUnread();
   const isSpectator = !!S.spectating;
   const me = S.you;
-  const swapMode = S.phase === 'swapSelect' && !S.seats[me].confirmed && !isSpectator; // 我正在選要蓋的 3 張牌
+  const swapMode = ((S.phase === 'swapSelect' && !S.seats[me].confirmed) || (S.phase === 'swapAsk' && S.dealer === me && S.swapLeft > 0)) && !isSpectator; // 我正在選要蓋的 3 張牌
   const pickMode = false; // 取牌改為系統自動隨機取；原條件：S.phase === 'swapPick' && S.turn === me && !isSpectator; // 輪到我取牌
   const key = `${S.handNo}-${S.phase}-${S.swapLeft}-${pickMode ? S.turn : ''}`;
   if (key !== swapKey) { swapKey = key; swapSel = []; swapPicks = {}; }
@@ -672,7 +672,7 @@ function renderGame() {
     const done = S.seats.filter((s) => s.confirmed).length;
     if (S.phase === 'swapAsk') {
       info = (S.dealer === me && !isSpectator)
-        ? `<div class="big">你是莊家，要換牌嗎？</div>${left}`
+        ? `<div class="big">可選擇三張牌進行換牌</div>${left}`
         : `<div>莊家 ${S.seats[S.dealer].name} 考慮換牌中</div>${left}`;
     } else if (S.phase === 'swapSelect') {
       info = `<div class="big">換牌：選 3 張蓋牌</div><div>已確定 ${done}/4 人</div>`;
@@ -944,20 +944,26 @@ function renderActionsInto(box) {
     return;
   }
   if (S.phase === 'seatPick') return;
-  if (S.phase === 'dice') {
-    if (S.dice && S.dice.thrower === S.you && !S.dice.values) btn('🎲 擲骰子', 'hu', () => send({ type: 'roll' }));
-    return;
-  }
+  if (S.phase === 'dice') return;
   if (S.phase === 'swapAsk') {
     if (S.dealer !== S.you) return;
-    btn(`開始換牌（還可 ${S.swapLeft} 次）`, '', () => send({ type: 'swapstart' }));
-    btn('不換了，開始打牌', '', () => send({ type: 'skipswap' }));
+    const row = document.createElement('div');
+    row.className = 'claimbtns';
+    roundBtn(row, '換', 'swap', swapSel.length === 3, () => {
+      const tiles = swapSel.map((k) => S.hand[k]);
+      send({ type: 'swapstart' });
+      send({ type: 'cover', tiles });
+    });
+    roundBtn(row, '不換', 'pass swapno', true, () => send({ type: 'skipswap' }));
+    box.appendChild(row);
     return;
   }
   if (S.phase === 'swapSelect') {
     if (S.seats[S.you].confirmed) { box.innerHTML = '<span class="hint">已確定，等待其他玩家…</span>'; return; }
-    const b = btn(`確定（已選 ${swapSel.length}/3 張）`, '', () => send({ type: 'cover', tiles: swapSel.map((k) => S.hand[k]) }));
-    b.disabled = swapSel.length !== 3;
+    const row = document.createElement('div');
+    row.className = 'claimbtns';
+    roundBtn(row, '換', 'swap', swapSel.length === 3, () => send({ type: 'cover', tiles: swapSel.map((k) => S.hand[k]) }));
+    box.appendChild(row);
     return;
   }
   if (S.phase === 'swapPick') {
@@ -1170,7 +1176,7 @@ function diceInfo() {
   const thrower = S.seats[d.thrower].name;
   const title = d.stage === 'dealer' ? '擲骰決定起莊' : `莊家 ${thrower} 擲骰開門`;
   if (!d.values) {
-    const wait = (d.thrower === S.you && !S.spectating) ? '<div class="big">請擲骰子</div>' : `<div>等待 ${thrower} 擲骰子…</div>`;
+    const wait = `<div>${thrower} 擲骰子中…</div>`;
     return `<div>${title}</div>${wait}<div class="dice">${'<span class="die idle">⚀</span>'.repeat(3)}</div>`;
   }
   const key = `${S.handNo}-${d.stage}-${d.rolledAt}`;
