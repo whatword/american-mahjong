@@ -2910,3 +2910,17 @@ button.danger {
   background: #2563eb;
   color: #fff;
 }
+
+/* MIGI／摸／不摸：寬度隨文字 */
+#actions button.rbtn.migi,
+#actions button.rbtn.swap,
+#actions button.rbtn.swapno {
+  width: auto;
+  min-width: 1em;
+  padding: 0 .35em;
+}
+
+#actions button.rbtn.migi.ready {
+  background: #e67e22;
+  color: #fff;
+}

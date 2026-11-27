@@ -755,6 +755,7 @@ function renderGame() {
   const hand = document.createElement('div');
   const related = isSpectator ? null : claimRelated();
   if (S.phase !== 'claim') claimPick = null;
+  if (S.phase !== 'discard' || S.turn !== S.you) kongPick = false;
   const addTile = (t, cls, idx) => {
     const e = tileEl(t, cls);
     if (related && related.has(t)) e.classList.add('sel');
@@ -901,6 +902,8 @@ function btn(text, cls, fn) {
 let actBox = null;
 // 目前展開選擇框的動作 (目前只有 'chi')
 let claimPick = null;
+// 自己回合有多種槓法時，是否展開選擇框
+let kongPick = false;
 
 // 有人打牌可以吃碰槓時，手牌中跟這些動作有關的牌 (用牌值表示)
 function claimRelated() {
@@ -969,24 +972,14 @@ function renderActionsInto(box) {
   if (S.phase === 'swapPick') {
     box.innerHTML = `<span class="hint">${S.turn === S.you ? '系統自動隨機幫你取牌…' : `${S.seats[S.turn].name} 取牌中…`}</span>`;
     return;
-    const others = [0, 1, 2, 3].filter((p) => p !== S.you);
-    const picked = others.filter((p) => swapPicks[p] !== undefined).length;
-    const forced = others.filter((p) => S.seats[p].cover && S.seats[p].cover.filter(Boolean).length === 1);
-    if (forced.length === 3) {
-      // 每家都只剩一張：伺服器會自動取牌，不用按
-      box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: '每家都只剩一張，已自動幫你取牌…' }));
-      return;
-    }
-    const b = btn(`確定取牌（${picked}/3）`, '', () => send({ type: 'swappick', picks: swapPicks }));
-    b.disabled = picked !== 3;
-    const tip = forced.length ? `${forced.map((p) => S.seats[p].name).join('、')} 只剩一張，已幫你選好；` : '';
-    box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: tip + '在其他三家面前各點一張蓋著的牌' }));
-    return;
   }
   if (S.phase === 'lastDraw') {
     if (S.turn !== S.you) return;
-    btn('摸牌', '', () => send({ type: 'draw' }));
-    btn('不摸，直接結束', 'hu', () => send({ type: 'endhand' }));
+    const row = document.createElement('div');
+    row.className = 'claimbtns';
+    roundBtn(row, '摸', 'swap', true, () => send({ type: 'draw' }));
+    roundBtn(row, '不摸', 'pass swapno', true, () => send({ type: 'endhand' }));
+    box.appendChild(row);
     return;
   }
   if (S.phase === 'discard' && S.turn === S.you && S.actions) {
@@ -1011,12 +1004,42 @@ function renderActionsInto(box) {
     if (a.migi && a.migi.length) {
       const selTile = selected === 'drawn' ? S.drawn : selected != null ? S.hand[selected] : null;
       const ok = selTile != null && a.migi.includes(selTile);
-      const b = btn(ok ? `MIGI（打出 ${tileName(selTile)}）` : 'MIGI', 'migi', () => send({ type: 'discard', tile: selTile, migi: true }));
-      b.disabled = !ok;
+      const row = document.createElement('div');
+      row.className = 'claimbtns';
+      roundBtn(row, 'MIGI', 'migi', ok, () => send({ type: 'discard', tile: selTile, migi: true }));
+      roundBtn(row, '過', 'pass', false);
+      box.appendChild(row);
       if (!ok) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: '可以 MIGI！先點選要打出的牌' }));
     }
-    a.angang.forEach((t) => btn(`暗槓 ${tileName(t)}`, '', () => send({ type: 'angang', tile: t })));
-    a.jiagang.forEach((t) => btn(`加槓 ${tileName(t)}`, '', () => send({ type: 'jiagang', tile: t })));
+    // 暗槓、加槓：一樣用吃碰槓胡過五個按鈕，有得槓時「槓」亮起來。多種槓法時點「槓」展開選擇框
+    const kongs = [...a.angang.map((t) => ({ type: 'angang', tile: t })), ...a.jiagang.map((t) => ({ type: 'jiagang', tile: t }))];
+    if (kongs.length) {
+      const row = document.createElement('div');
+      row.className = 'claimbtns';
+      const doKong = (k) => { kongPick = false; send({ type: k.type, tile: k.tile }); };
+      roundBtn(row, '吃', 'chi', false);
+      roundBtn(row, '碰', 'pong', false);
+      roundBtn(row, '槓', 'kong', true, () => {
+        if (kongs.length === 1) doKong(kongs[0]);
+        else { kongPick = !kongPick; renderGame(); }
+      }, kongPick);
+      roundBtn(row, '胡', 'hu', false);
+      roundBtn(row, '過', 'pass', false);
+      if (kongPick && kongs.length > 1) {
+        const pick = document.createElement('div');
+        pick.className = 'claimpick';
+        kongs.forEach((k) => {
+          const d = document.createElement('div');
+          d.className = 'chiopt';
+          d.title = k.type === 'angang' ? '暗槓' : '加槓';
+          d.appendChild(tileEl(k.tile, 'sm'));
+          d.onclick = () => doKong(k);
+          pick.appendChild(d);
+        });
+        row.appendChild(pick);
+      }
+      box.appendChild(row);
+    }
     if (box.children.length === 1) {
       const tingTip = S.ting && S.ting.byDiscard ? '・▲ 打出就聽牌，點選看聽什麼' : '';
       box.insertAdjacentHTML('beforeend', `<span class="hint">點兩下打出${tingTip}</span>`);
