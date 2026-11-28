@@ -2929,3 +2929,48 @@ button.danger {
   background: #e67e22;
   color: #fff;
 }
+
+/* MIGI：宣告的玩家要更顯眼 */
+.say-migibox {
+  background: #8e44ad;
+  border: 3px solid #ffd479;
+  box-shadow: 0 0 24px 6px #c27bffcc, 0 6px 18px #0009;
+}
+
+.say-migibox .say-name {
+  color: #f0dcff;
+}
+
+.say-migibox .say-line {
+  font-size: 30px;
+  color: #fff;
+}
+
+.say-migibox .say-migi {
+  color: #ffd479;
+  font-size: 44px;
+  letter-spacing: 3px;
+  text-shadow: 0 2px 0 #4a1d63;
+}
+
+.seat.migi-on,
+#me.migi-on {
+  box-shadow: 0 0 0 3px #c27bff, 0 0 18px 4px #a35bd8aa;
+  animation: migi-glow 1.6s ease-in-out infinite;
+}
+
+.migi-badge {
+  padding: 2px 12px;
+  font-size: 16px;
+  border: 2px solid #ffd479;
+  box-shadow: 0 0 10px #c27bff;
+  animation: migi-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes migi-glow {
+  50% { box-shadow: 0 0 0 3px #e0b3ff, 0 0 28px 8px #c27bff; }
+}
+
+@keyframes migi-pulse {
+  50% { transform: scale(1.12); }
+}

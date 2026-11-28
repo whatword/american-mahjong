@@ -583,7 +583,7 @@ function renderGame() {
     const wind = WINDS[(i - S.dealer + 4) % 4];
     if (k !== 0) {
       const seatEl = $('seat' + k);
-      seatEl.className = 'seat ' + ['', 'right', 'top', 'left'][k] + (S.phase !== 'over' && S.turn === i ? ' turn' : '') + (isSpectator ? ' spectator-clickable' : '');
+      seatEl.className = 'seat ' + ['', 'right', 'top', 'left'][k] + (S.phase !== 'over' && S.turn === i ? ' turn' : '') + (s.migi ? ' migi-on' : '') + (isSpectator ? ' spectator-clickable' : '');
       if (isSpectator) {
         seatEl.title = `點擊切換至 ${s.name} 的視角`;
         seatEl.onclick = () => send({ type: 'switchView', seat: i });
@@ -682,6 +682,11 @@ function renderGame() {
         : `<div>輪到 ${S.seats[S.turn].name} 取牌</div>`;
     }
   }
+  if (S.phase === 'migiAsk') {
+    info = S.migiAsk && !isSpectator
+      ? '<div class="big">換牌後你已聽牌</div><div>可以直接 MIGI</div>'
+      : `<div>等待 ${(S.waiting || []).map((p) => S.seats[p].name).join('、')} 決定是否 MIGI</div>`;
+  }
   info += `<div class="timer" id="timer"></div>`;
   $('info').innerHTML = info;
   if (S.phase === 'seatPick' && S.seatPick) renderSeatPick($('info'));
@@ -690,6 +695,7 @@ function renderGame() {
   const wind = WINDS[(me - S.dealer + 4) % 4];
   const myTurn = S.phase === 'discard' && S.turn === me && !isSpectator;
   const mm = document.createElement('div');
+  $('me').classList.toggle('migi-on', !!S.seats[me].migi);
   const viewingBadge = isSpectator ? '<span class="tag viewing-tag">當前視角</span>' : '';
   // 名稱下方放聽牌小燈泡 (亮起時點一下看聽牌內容)
   const lampBtns = (!isSpectator && S.ting ? '<button type="button" id="tingLamp" class="ting-lamp" title="聽牌提醒" aria-label="聽牌提醒">💡</button>' : '') +
@@ -969,6 +975,15 @@ function renderActionsInto(box) {
     box.appendChild(row);
     return;
   }
+  if (S.phase === 'migiAsk') {
+    if (!S.migiAsk) return;
+    const row = document.createElement('div');
+    row.className = 'claimbtns';
+    roundBtn(row, 'MIGI', 'migi', true, () => send({ type: 'migi' }));
+    roundBtn(row, '不 MIGI', 'pass swapno', true, () => send({ type: 'skipmigi' }));
+    box.appendChild(row);
+    return;
+  }
   if (S.phase === 'swapPick') {
     box.innerHTML = `<span class="hint">${S.turn === S.you ? '系統自動隨機幫你取牌…' : `${S.seats[S.turn].name} 取牌中…`}</span>`;
     return;
@@ -1177,7 +1192,7 @@ function startTimer() {
   const upd = () => {
     const left = Math.max(0, Math.ceil((S.deadline - Date.now()) / 1000));
     const t = $('timer');
-    if (t && (S.phase === 'discard' || S.phase === 'lastDraw' || S.phase === 'claim' || S.phase === 'seatPick' || S.phase === 'dice' || S.phase.startsWith('swap'))) t.textContent = `⏱ ${left}s` + (S.wall > 0 && S.phase !== 'seatPick' && S.phase !== 'dice' && !S.phase.startsWith('swap') ? ` ｜ 剩餘 ${S.wall} 張` : '');
+    if (t && (S.phase === 'discard' || S.phase === 'lastDraw' || S.phase === 'claim' || S.phase === 'migiAsk' || S.phase === 'seatPick' || S.phase === 'dice' || S.phase.startsWith('swap'))) t.textContent = `⏱ ${left}s` + (S.wall > 0 && S.phase !== 'seatPick' && S.phase !== 'dice' && !S.phase.startsWith('swap') ? ` ｜ 剩餘 ${S.wall} 張` : '');
     const nt = $('nextTimer');
     if (nt && S.result && S.result.nextAt) nt.textContent = `${Math.max(0, Math.ceil((S.result.nextAt - Date.now()) / 1000))} 秒後自動開始`;
   };
@@ -1261,7 +1276,7 @@ function showSay(m) {
   const win = ['hu', 'zimo', 'rob', 'special'].includes(m.kind);
   const call = ['pong', 'chi', 'kong'].includes(m.kind);
   const el = document.createElement('div');
-  el.className = 'say ' + (win ? 'say-win' : call ? 'say-call' : 'say-discard') + ' from' + k;
+  el.className = 'say ' + (win ? 'say-win' : call ? 'say-call' : m.kind === 'migi' ? 'say-migibox' : 'say-discard') + ' from' + k;
   const name = document.createElement('span');
   name.className = 'say-name';
   name.textContent = S.seats[m.seat] ? S.seats[m.seat].name : '';
@@ -1270,8 +1285,10 @@ function showSay(m) {
   line.className = 'say-line';
   if (m.kind === 'discard' || m.kind === 'migi') {
     if (m.kind === 'migi') line.appendChild(Object.assign(document.createElement('b'), { className: 'say-migi', textContent: 'MIGI！' }));
-    line.appendChild(tileEl(m.tile, 'sm'));
-    line.append(tileName(m.tile));
+    if (m.tile != null) {
+      line.appendChild(tileEl(m.tile, 'sm'));
+      line.append(tileName(m.tile));
+    }
   } else {
     line.append(m.kind === 'special' ? `${m.text}！` : SAY_TEXT[m.kind] || '');
   }
@@ -1283,7 +1300,7 @@ function showSay(m) {
   sayEls[m.seat] = el;
   $('sayLayer').appendChild(el);
   placeSay(el, anchor, k);
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); if (sayEls[m.seat] === el) delete sayEls[m.seat]; }, 250); }, win ? 2200 : call ? 1600 : 1300);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); if (sayEls[m.seat] === el) delete sayEls[m.seat]; }, 250); }, win ? 2200 : call || m.kind === 'migi' ? 1600 : 1300);
 }
 
 // ---------- 自摸特效 ----------
@@ -1431,7 +1448,7 @@ function speak(text, seat = 0, force = false) {
 function speakSay(m) {
   if (!voiceOn) return;
   const text = m.kind === 'discard' ? tileName(m.tile)
-    : m.kind === 'migi' ? `MIGI，${tileName(m.tile)}`
+    : m.kind === 'migi' ? (m.tile != null ? `MIGI，${tileName(m.tile)}` : 'MIGI')
       : m.kind === 'special' ? m.text
         : ({ pong: '碰', chi: '吃', kong: '槓', hu: '胡', zimo: '自摸', rob: '搶槓' })[m.kind];
   speechSynthesis.cancel();

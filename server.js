@@ -28,6 +28,7 @@ const SELECT_MS = 40000;
 const PICK_MS = 30000;
 const FORCED_PICK_MS = Number(process.env.FORCED_PICK_MS ?? 1500); // 每家都只剩一張可取時，自動取牌前的展示時間
 const MAX_SWAPS = 2;
+const MIGI_ASK_MS = 15000; // 換牌後已聽牌者決定是否 MIGI 的時間
 const BOT_DELAY = Number(process.env.BOT_DELAY ?? 700);
 
 // ---------- 靜態檔案 ----------
@@ -386,6 +387,43 @@ class Room {
     const d = this.seats[this.dealer];
     // 不論有沒有換牌：以排序後最右邊 (最大) 的牌當作第 17 張，畫面上手牌維持排序
     d.drawn = Math.max(...d.hand);
+    this.startMigiAsk();
+  }
+
+  // 換牌結束後：換完就已聽牌的閒家 (16 張、不用打牌) 可以直接 MIGI。
+  // 全部決定完才輪到莊家出牌，因此下家 (或任何人) 都是先決定 MIGI，才會有吃碰槓胡
+  startMigiAsk() {
+    const pending = [];
+    for (let i = 0; i < 4; i++) {
+      const s = this.seats[i];
+      if (i !== this.dealer && !s.migi && s.melds.length === 0 && s.hand.length % 3 === 1 && G.waits(s.hand, 0).length > 0) pending.push(i);
+    }
+    this.migiPending = new Set(pending);
+    if (!pending.length) return this.enterDiscard(this.dealer);
+    this.phase = 'migiAsk';
+    this.turn = this.dealer;
+    this.claims = null;
+    this.setTimer(MIGI_ASK_MS, () => this.finishMigiAsk());
+    this.broadcast();
+    this.maybeAct();
+  }
+
+  migiAnswer(i, declare) {
+    if (this.phase !== 'migiAsk' || !this.migiPending.has(i)) return;
+    this.migiPending.delete(i);
+    if (declare) {
+      const s = this.seats[i];
+      s.migi = true;
+      this.sys(`${s.name} 宣告 MIGI！`);
+      this.say(i, 'migi', null);
+    }
+    if (this.migiPending.size === 0) this.finishMigiAsk();
+    else this.broadcast();
+  }
+
+  finishMigiAsk() {
+    if (this.phase !== 'migiAsk') return;
+    this.migiPending = new Set();
     this.enterDiscard(this.dealer);
   }
 
@@ -654,6 +692,10 @@ class Room {
         else if (msg.type === 'skipswap') this.finishSwap();
       } else if (this.phase === 'swapSelect' && msg.type === 'cover') this.confirmCover(i, msg.tiles);
       else if (this.phase === 'swapPick' && msg.type === 'swappick') this.doPick(i, msg.picks);
+      return;
+    }
+    if (this.phase === 'migiAsk') {
+      if (msg.type === 'migi' || msg.type === 'skipmigi') this.migiAnswer(i, msg.type === 'migi');
       return;
     }
     if (this.phase === 'lastDraw') {
@@ -1151,6 +1193,11 @@ class Room {
       const i = this.turn;
       // 取牌一律隨機自動取，不論真人或電腦
       setTimeout(() => { if (seq === this.seq && this.phase === 'swapPick' && this.turn === i) this.autoPick(i); }, BOT_DELAY);
+    } else if (this.phase === 'migiAsk') {
+      // 電腦已聽牌就 MIGI (與打牌時一致)
+      for (const i of this.migiPending) {
+        if (this.isAuto(i)) setTimeout(() => { if (seq === this.seq && this.phase === 'migiAsk') this.migiAnswer(i, true); }, BOT_DELAY);
+      }
     } else if (this.phase === 'lastDraw' && this.isAuto(this.turn)) {
       const i = this.turn;
       // 電腦未聽牌：不摸，直接結束
@@ -1236,6 +1283,7 @@ class Room {
       v.drawn = drawn;
       if (this.phase === 'discard' && this.turn === i) v.actions = this.selfActions(i);
       v.ting = this.tingInfo(i);
+      if (this.phase === 'migiAsk') { v.migiAsk = this.migiPending.has(i); v.waiting = [...this.migiPending]; }
       if (this.phase === 'claim' && this.claims && this.claims[i]) {
         v.claim = { opts: this.claims[i].opts, resp: this.claims[i].resp && this.claims[i].resp.type };
       }
