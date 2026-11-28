@@ -7,6 +7,7 @@ const WINDS = ['東', '南', '西', '北'];
 const $ = (id) => document.getElementById(id);
 
 let swapSel = [], swapPicks = {}, swapKey = '';
+let migiChoice = null; // 可 MIGI 時要先選：null 未選 / 'yes' / 'no'
 let ws, S = null, selected = null, tick = null; // selected: 手牌位置 (index)
 
 // 牌面圖：萬筒條與字牌用 FluffyStuff 圖組 (公有領域)，花牌為自製；圖案疊在 Front.svg 上
@@ -782,7 +783,10 @@ function renderGame() {
         if (!myTurn) return;
         if (S.actions && S.actions.locked && idx !== 'drawn') return toast('MIGI 中只能打出摸進的牌');
         if (S.actions && S.actions.forbid && S.actions.forbid.includes(t)) return toast(`剛吃碰完，不能馬上打出 ${tileName(t)}`);
-        if (selected === idx) { selected = null; send({ type: 'discard', tile: t }); }
+        const mo = S.actions && S.actions.migi && S.actions.migi.length ? S.actions.migi : null;
+        if (mo && migiChoice == null) return toast('請先選擇要不要 MIGI');
+        if (mo && migiChoice === 'yes' && !mo.includes(t)) return toast('打出這張後沒有聽牌，不能 MIGI');
+        if (selected === idx) { selected = null; send(mo && migiChoice === 'yes' ? { type: 'discard', tile: t, migi: true } : { type: 'discard', tile: t }); }
         else { selected = idx; renderGame(); }
       };
     }
@@ -800,19 +804,22 @@ function renderGame() {
   // 打出後能聽牌的牌，在牌上加小標記
   const tingable = (t) => (myTurn && S.ting && S.ting.byDiscard && S.ting.byDiscard[t] ? ' tingable' : '');
   // MIGI 中只能摸打：手上其他牌變暗、不能點
+  const migiOpts = myTurn && S.actions && S.actions.migi && S.actions.migi.length ? S.actions.migi : null;
+  if (!migiOpts) migiChoice = null;
   const locked = myTurn && S.actions && S.actions.locked ? ' locked' : '';
+  const migiDim = (t) => (migiOpts && (migiChoice == null || (migiChoice === 'yes' && !migiOpts.includes(t))) ? ' locked' : '');
   // 剛吃/碰完，不能馬上打出的牌 (變暗、不能點)
   const forbid = new Set(myTurn && S.actions && S.actions.forbid ? S.actions.forbid : []);
   // 剛換進來的牌加上「換」標記 (同樣的牌換進幾張就標幾張)
   const swapLeft = {};
   for (const t of S.swapIn || []) swapLeft[t] = (swapLeft[t] || 0) + 1;
   const swapped = (t) => (swapLeft[t] > 0 ? (swapLeft[t]--, ' swapin') : '');
-  (S.hand || []).forEach((t, k) => addTile(t, tingable(t) + locked + swapped(t) + (forbid.has(t) ? ' forbid' : ''), k));
-  if (S.drawn != null) addTile(S.drawn, 'drawn' + tingable(S.drawn) + swapped(S.drawn), 'drawn');
+  (S.hand || []).forEach((t, k) => addTile(t, tingable(t) + locked + migiDim(t) + swapped(t) + (forbid.has(t) ? ' forbid' : ''), k));
+  if (S.drawn != null) addTile(S.drawn, 'drawn' + tingable(S.drawn) + migiDim(S.drawn) + swapped(S.drawn), 'drawn');
   patchChildren(handEl, [...hand.childNodes]);
   // 有選牌時，其他牌稍微變暗，讓選到的牌更突出
   handEl.classList.toggle('has-sel', !isSpectator && !!handEl.querySelector('.tile.sel'));
-  if (!myTurn) selected = null;
+  if (!myTurn) { selected = null; migiChoice = null; }
 
   renderTing(myTurn);
   renderActions();
@@ -1018,14 +1025,18 @@ function renderActionsInto(box) {
       return;
     }
     if (a.migi && a.migi.length) {
-      const selTile = selected === 'drawn' ? S.drawn : selected != null ? S.hand[selected] : null;
-      const ok = selTile != null && a.migi.includes(selTile);
       const row = document.createElement('div');
       row.className = 'claimbtns';
-      roundBtn(row, 'MIGI', 'migi', ok, () => send({ type: 'discard', tile: selTile, migi: true }));
-      roundBtn(row, '過', 'pass', false);
-      box.appendChild(row);
-      if (!ok) box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: '可以 MIGI！先點選要打出的牌' }));
+      if (migiChoice == null) {
+        roundBtn(row, 'MIGI', 'migi', true, () => { migiChoice = 'yes'; selected = null; renderGame(); });
+        roundBtn(row, '不 MIGI', 'pass swapno', true, () => { migiChoice = 'no'; selected = null; renderGame(); });
+        box.appendChild(row);
+        box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: '可以 MIGI！請先選擇，再打牌' }));
+      } else if (migiChoice === 'yes') {
+        roundBtn(row, '取消', 'pass swapno', true, () => { migiChoice = null; selected = null; renderGame(); });
+        box.appendChild(row);
+        box.appendChild(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'MIGI：點兩下亮著的牌打出' }));
+      }
     }
     // 暗槓、加槓：一樣用吃碰槓胡過五個按鈕，有得槓時「槓」亮起來。多種槓法時點「槓」展開選擇框
     const kongs = [...a.angang.map((t) => ({ type: 'angang', tile: t })), ...a.jiagang.map((t) => ({ type: 'jiagang', tile: t }))];
