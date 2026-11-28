@@ -2974,3 +2974,11 @@ button.danger {
 @keyframes migi-pulse {
   50% { transform: scale(1.12); }
 }
+
+/* 聊天室訊息的對話框 */
+.say-chat .say-line {
+  font-size: 18px;
+  max-width: 220px;
+  white-space: normal;
+  word-break: break-word;
+}

@@ -750,6 +750,16 @@ class Room {
     for (const [sws] of this.spectators) if (sws.readyState === 1) send(sws, msg);
   }
 
+  // 聊天室訊息：存進聊天記錄，並在說話者旁跳出對話框 (觀戰者 seat = -1)
+  chatMsg(seat, name, text) {
+    this.chat.push({ from: name, text });
+    this.chat = this.chat.slice(-50);
+    const msg = { type: 'say', seat, kind: 'chat', tile: null, text, name };
+    for (const s of this.seats) if (s && s.ws) send(s.ws, msg);
+    for (const [sws] of this.spectators) if (sws.readyState === 1) send(sws, msg);
+    this.broadcast();
+  }
+
   // 自摸特效的內容：胡牌的整副牌 (摸進的牌放最右)，以及要顯示的文字
   // 第一行：4 台以上的牌型 (用 + 連接)；第二行：門清一摸三 (門清自摸 + 不求人) 或 自摸
   zimoFx(win) {
@@ -1478,9 +1488,12 @@ wss.on('connection', (ws) => {
           }
           break;
         }
-        case 'chat':
-          send(ws, { type: 'toast', text: '觀戰模式無法發言' });
+        case 'chat': {
+          const text = String(msg.text || '').trim().slice(0, 100);
+          const spec = room.spectators.get(ws);
+          if (text && spec) room.chatMsg(-1, `👀 ${spec.name}`, text);
           break;
+        }
         default:
           break;
       }
@@ -1496,7 +1509,7 @@ wss.on('connection', (ws) => {
         break;
       case 'chat': {
         const text = String(msg.text || '').trim().slice(0, 100);
-        if (text) { room.chat.push({ from: room.seats[seat].name, text }); room.broadcast(); }
+        if (text) room.chatMsg(seat, room.seats[seat].name, text);
         break;
       }
       case 'recommend': {

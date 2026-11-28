@@ -1111,14 +1111,6 @@ function updateUnread() {
 }
 $('chatClose').onclick = () => { document.body.classList.remove('chat-open'); if (S) renderGame(); };
 function renderChat() {
-  const isSpectator = !!(S && S.spectating);
-  const inp = $('chatInput');
-  const btnEl = $('chatForm').querySelector('button');
-  if (inp) {
-    inp.disabled = isSpectator;
-    inp.placeholder = isSpectator ? '觀戰模式無法發言' : '聊天...';
-  }
-  if (btnEl) btnEl.disabled = isSpectator;
 
   const log = $('chatlog');
   const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
@@ -1133,7 +1125,6 @@ function renderChat() {
 }
 $('chatForm').onsubmit = (e) => {
   e.preventDefault();
-  if (S && S.spectating) return;
   const v = $('chatInput').value.trim();
   if (v) send({ type: 'chat', text: v });
   $('chatInput').value = '';
@@ -1270,20 +1261,23 @@ const SAY_TEXT = { pong: '碰！', chi: '吃！', kong: '槓！', hu: '胡！', 
 const sayEls = {};
 function showSay(m) {
   if (!S || S.state !== 'playing') return;
-  const k = (m.seat - S.you + 4) % 4; // 0 自己、1 下家 (右)、2 對家、3 上家 (左)
+  const fromSpec = m.seat < 0; // 觀戰者聊天：沒有座位，對話框放在自己的牌區
+  const k = fromSpec ? 0 : (m.seat - S.you + 4) % 4; // 0 自己、1 下家 (右)、2 對家、3 上家 (左)
   const anchor = k === 0 ? $('me') : $('seat' + k);
   if (!anchor || !anchor.offsetParent) return;
   const win = ['hu', 'zimo', 'rob', 'special'].includes(m.kind);
   const call = ['pong', 'chi', 'kong'].includes(m.kind);
   const el = document.createElement('div');
-  el.className = 'say ' + (win ? 'say-win' : call ? 'say-call' : m.kind === 'migi' ? 'say-migibox' : 'say-discard') + ' from' + k;
+  el.className = 'say ' + (win ? 'say-win' : call ? 'say-call' : m.kind === 'migi' ? 'say-migibox' : m.kind === 'chat' ? 'say-chat' : 'say-discard') + ' from' + k + (fromSpec ? ' inside' : '');
   const name = document.createElement('span');
   name.className = 'say-name';
-  name.textContent = S.seats[m.seat] ? S.seats[m.seat].name : '';
+  name.textContent = m.kind === 'chat' && m.name ? m.name : S.seats[m.seat] ? S.seats[m.seat].name : '';
   el.appendChild(name);
   const line = document.createElement('div');
   line.className = 'say-line';
-  if (m.kind === 'discard' || m.kind === 'migi') {
+  if (m.kind === 'chat') {
+    line.textContent = m.text || '';
+  } else if (m.kind === 'discard' || m.kind === 'migi') {
     if (m.kind === 'migi') line.appendChild(Object.assign(document.createElement('b'), { className: 'say-migi', textContent: 'MIGI！' }));
     if (m.tile != null) {
       line.appendChild(tileEl(m.tile, 'sm'));
@@ -1293,14 +1287,14 @@ function showSay(m) {
     line.append(m.kind === 'special' ? `${m.text}！` : SAY_TEXT[m.kind] || '');
   }
   el.appendChild(line);
-  speakSay(m);
+  if (m.kind !== 'chat') speakSay(m);
   if (m.kind === 'zimo' && m.fx) showZimoFx(m);
   // 同一位玩家的新對話框取代舊的
   if (sayEls[m.seat]) sayEls[m.seat].remove();
   sayEls[m.seat] = el;
   $('sayLayer').appendChild(el);
   placeSay(el, anchor, k);
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); if (sayEls[m.seat] === el) delete sayEls[m.seat]; }, 250); }, win ? 2200 : call || m.kind === 'migi' ? 1600 : 1300);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); if (sayEls[m.seat] === el) delete sayEls[m.seat]; }, 250); }, win ? 2200 : m.kind === 'chat' ? 3000 : call || m.kind === 'migi' ? 1600 : 1300);
 }
 
 // ---------- 自摸特效 ----------

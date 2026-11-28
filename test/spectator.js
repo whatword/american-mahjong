@@ -97,10 +97,10 @@ async function main() {
   await new Promise((r) => setTimeout(r, 200));
   ok(switchedState2.hand.length === handBefore.length, '觀戰者無法進行出牌與遊戲操作');
 
-  // 測試觀戰者無法發言 (防止報牌)
-  spec1.send({ type: 'chat', text: '報牌測試：東風' });
-  const chatToast = await spec1.wait(isType('toast'));
-  ok(/無法發言/.test(chatToast.text), '觀戰者無法在聊天室發言：' + chatToast.text);
+  // 測試觀戰者可以發言，且會跳出對話框
+  spec1.send({ type: 'chat', text: '加油' });
+  const chatSay = await spec1.wait((m) => m.type === 'say' && m.kind === 'chat');
+  ok(chatSay.seat === -1 && chatSay.text === '加油', '觀戰者聊天會送出對話框訊息');
 
   // 測試第二位觀戰者加入 (多人觀戰且各自獨立視角)
   const spec2 = await login('觀戰者2', 'spec2@example.com');
