@@ -126,6 +126,9 @@ class Room {
     this.spectators.set(ws, spec);
     ws.ctx = { room: this, seat: -1, spectator: true, viewSeat: defaultSeat };
     this.sys(`${name} 進入了觀戰`);
+    const joinMsg = { type: 'specJoin', name };
+    for (const s of this.seats) if (s && s.ws) send(s.ws, joinMsg);
+    for (const [sws] of this.spectators) if (sws.readyState === 1) send(sws, joinMsg);
     send(ws, this.viewForSpectator(ws));
     hallChanged();
     return true;

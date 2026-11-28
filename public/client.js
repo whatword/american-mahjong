@@ -121,6 +121,7 @@ function connect(name, email) {
     else if (m.type === 'state') { S = m; render(); }
     else if (m.type === 'toast') toast(m.text);
     else if (m.type === 'say') showSay(m);
+    else if (m.type === 'specJoin') showSpecJoin(m.name);
     else if (m.type === 'recommend') {
       if (!S || S.phase !== 'discard' || S.turn !== S.you) return;
       advice = { key: m.key, tile: m.tile, danger: new Set(m.danger || []), safe: new Set(m.safe || []) };
@@ -1199,6 +1200,15 @@ function toast(text) {
   setTimeout(() => d.remove(), 2500);
 }
 
+// 觀戰者加入的顯眼提示
+function showSpecJoin(name) {
+  const d = document.createElement('div');
+  d.className = 'spec-join';
+  d.textContent = `👀 ${name} 開始觀戰`;
+  specBox().appendChild(d);
+  setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 400); }, 4000);
+}
+
 const DICE_FACE = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 let diceAnimKey = '';
 // 擲骰資訊：所有玩家都看得到骰子與結果
@@ -1259,10 +1269,31 @@ function renderSeatPick(box) {
 // 伺服器在打牌、吃、碰、槓、胡時送來 say 事件，在該玩家旁邊跳出對話框 (電腦也一樣)
 const SAY_TEXT = { pong: '碰！', chi: '吃！', kong: '槓！', hu: '胡！', zimo: '自摸！', rob: '搶槓！' };
 const sayEls = {};
+// 觀戰者的聊天對話框：固定疊在右上角的觀看區
+function specBox() {
+  let box = $('specSayBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'specSayBox';
+    $('sayLayer').appendChild(box);
+  }
+  return box;
+}
+function showSpecSay(m) {
+  const box = specBox();
+  const el = document.createElement('div');
+  el.className = 'say say-chat say-spec';
+  el.appendChild(Object.assign(document.createElement('span'), { className: 'say-name', textContent: m.name || '👀' }));
+  el.appendChild(Object.assign(document.createElement('div'), { className: 'say-line', textContent: m.text || '' }));
+  box.appendChild(el);
+  while (box.children.length > 4) box.firstChild.remove();
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, 4000);
+}
 function showSay(m) {
   if (!S || S.state !== 'playing') return;
   const fromSpec = m.seat < 0; // 觀戰者聊天：沒有座位，對話框放在自己的牌區
   const k = fromSpec ? 0 : (m.seat - S.you + 4) % 4; // 0 自己、1 下家 (右)、2 對家、3 上家 (左)
+  if (fromSpec) { showSpecSay(m); return; }
   const anchor = k === 0 ? $('me') : $('seat' + k);
   if (!anchor || !anchor.offsetParent) return;
   const win = ['hu', 'zimo', 'rob', 'special'].includes(m.kind);

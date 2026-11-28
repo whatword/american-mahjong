@@ -2982,3 +2982,46 @@ button.danger {
   white-space: normal;
   word-break: break-word;
 }
+
+/* 觀戰者聊天：右上角觀看區 */
+#specSayBox {
+  position: fixed;
+  top: 52px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 60vw;
+}
+
+.say.say-spec {
+  position: static;
+  background: #dbeafe;
+  border: 2px solid #2563eb;
+}
+
+/* 觀戰者加入提示 */
+.spec-join {
+  background: #2563eb;
+  color: #fff;
+  border: 3px solid #ffd479;
+  border-radius: 14px;
+  padding: 10px 20px;
+  font-size: 22px;
+  font-weight: bold;
+  box-shadow: 0 8px 24px #000a;
+  animation: say-pop .3s cubic-bezier(.2, 1.6, .5, 1);
+  transition: opacity .4s;
+}
+
+.spec-join.out {
+  opacity: 0;
+}
+
+@media (max-width: 600px) {
+  .spec-join {
+    font-size: 16px;
+    padding: 6px 12px;
+  }
+}
